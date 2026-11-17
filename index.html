@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recipe Costs</title>
+<meta name="theme-color" content="#2f5d50">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a practical kitchen tool for a household, friendly and quick on a phone
+   IDEA: every recipe becomes a supermarket till docket, one per store, side by side
+   PICTURE: the cost docket with the three supermarkets and the split shop, big totals
+   COLOUR and TYPE: white, bay-leaf green band, tomato accent, chain dots in their own colours; Archivo + Inter, DM Mono for money
+   LAYOUT: green header with tabs, one calm column up to 820px, stacks cleanly on a phone */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#101412);--ink:light-dark(#16201b,#ecefea);--mute:light-dark(#5b6861,#9ba69f);--line:light-dark(#e2e6e2,#29302c);--leaf:light-dark(#2f5d50,#1b382f);--tom:light-dark(#cf3a20,#ff6a4d);--paper:light-dark(#ffffff,#191e1b);--soft:light-dark(#f2f5f1,#161b18);--pns:#f2c200;--ww:#1f8a43;--nw:#d9142a}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:Archivo,Inter,sans-serif;line-height:1.05;text-wrap:balance;margin:0}
+h2.v{font-size:28px;margin-bottom:6px}h3.s{font-size:20px;margin:28px 0 8px}
+header.top{background:var(--leaf);color:#f3f7f2;padding:20px max(5vw,16px) 0}
+header.top h1{font-size:clamp(28px,6vw,42px);font-weight:800}
+header.top p{margin:4px 0 14px;opacity:.85}
+nav{display:flex;gap:2px;overflow-x:auto}
+nav a{flex:none;color:#f3f7f2;text-decoration:none;padding:12px 10px;font-size:15px;border-radius:12px 12px 0 0;font-weight:600;min-height:44px}
+nav a[aria-current=page]{background:var(--bg);color:var(--ink)}
+nav a .n{font:500 12px "DM Mono",monospace;background:var(--tom);color:#fff;border-radius:9px;padding:1px 6px;margin-left:4px}
+main{max-width:820px;margin:0 auto;padding:22px max(4vw,14px) 80px}
+button,.btn{font:600 16px Inter,sans-serif;min-height:44px;padding:10px 18px;border-radius:12px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.go{background:var(--tom)!important;border-color:var(--tom)!important;color:#fff!important}
+button.link{border:0;background:none;color:var(--tom);padding:6px 0;min-height:32px;text-decoration:underline}
+button:disabled{opacity:.6}
+:focus-visible{outline:3px solid var(--tom);outline-offset:2px}
+input,textarea,select{font:16px Inter,sans-serif;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px;width:100%}
+textarea{min-height:120px;resize:vertical}#a-t{min-height:240px}
+label{display:block;font-weight:600;font-size:14px;margin:12px 0 6px}
+.hint{color:var(--mute);font-size:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.card{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;align-items:center;padding:16px;border:1.5px solid var(--line);border-radius:14px;background:var(--paper);cursor:pointer;width:100%}
+.card h3{font-size:19px}.card .p{font:500 20px "DM Mono",monospace;white-space:nowrap;text-align:right}
+.card .s{color:var(--mute);font-size:14px}.card .s b{color:var(--ink);font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.chip{min-height:36px;padding:4px 12px;border-radius:18px;font-size:14px}.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tag{font-size:12px;font-weight:600;color:var(--mute);border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-right:4px}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:8px;vertical-align:0;flex:none}
+.docket{background:var(--paper);border:1.5px solid var(--line);border-bottom:0;padding:22px clamp(16px,4vw,30px) 40px;margin:14px 0 8px;
+  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/16px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/16px 100%}
+.docket h2{font-size:clamp(24px,5vw,34px);margin-bottom:6px}
+.src{font-size:14px;color:var(--mute)}.src a{color:inherit}
+.serv{display:flex;align-items:center;gap:12px;margin:14px 0 4px}
+.serv button{width:44px;padding:0;font-size:22px}.serv b{font:500 22px "DM Mono",monospace;min-width:2ch;text-align:center}
+.stores{margin:14px 0 0;border-top:1.5px dashed var(--line)}
+.st{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;align-items:center;padding:12px 0;border-bottom:1.5px dashed var(--line)}
+.st .nm{display:flex;align-items:center;font-weight:600}.st small{grid-column:1;color:var(--mute);padding-left:19px}
+.st .m{font:500 22px "DM Mono",monospace;text-align:right;white-space:nowrap}.st .m i{font:600 13px Inter,sans-serif;color:var(--tom);font-style:normal;display:block}
+.st.best .m{color:var(--tom)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:baseline;margin-top:16px}
+.split .big{font:500 clamp(34px,8vw,46px) "DM Mono",monospace;color:var(--tom);white-space:nowrap;text-align:right}
+.split span{font-weight:600}.split small{color:var(--mute)}
+.grp{margin:16px 0 0}.grp h4{display:flex;align-items:center;margin:0;padding:10px 0;font-size:16px;border-bottom:2px solid var(--ink)}.grp h4 .t{margin-left:auto;font:500 16px "DM Mono",monospace}
+.it{border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:0 12px}
+.it>button{all:unset;box-sizing:border-box;flex:1 1 0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;padding:11px 2px;cursor:pointer;min-height:44px;align-items:center}
+.it>button:focus-visible{outline:3px solid var(--tom)}
+.it>.ed{flex-basis:100%}
+.it .nm{font-size:15px}.it small{grid-column:1;color:var(--mute);font-size:13px}
+.it .c{text-align:right;white-space:nowrap;font:500 16px "DM Mono",monospace}.it .c.miss{color:var(--tom);font:600 14px Inter,sans-serif}
+.it.skip .nm{color:var(--mute);text-decoration:line-through}
+.ck{width:22px;height:22px;min-height:22px;accent-color:var(--leaf)}
+.it.done .nm{text-decoration:line-through;color:var(--mute)}
+.est{font:600 11px Inter,sans-serif;color:var(--mute);border:1px solid var(--line);border-radius:6px;padding:0 5px;margin-left:6px}
+.warn{background:var(--soft);border-radius:12px;padding:12px 14px;margin-top:14px;font-size:15px}
+.ed{background:var(--soft);border-radius:12px;padding:4px 14px 14px;margin:0 0 12px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 10px}
+.pg{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) auto;gap:8px 10px;align-items:center;margin-top:8px}
+.pg .h{font-size:13px;color:var(--mute);font-weight:600}
+.chk{display:flex;gap:10px;align-items:center;font-weight:500;margin-top:12px}.chk input{width:22px;min-height:22px}
+ol.meth{padding-left:22px}ol.meth li{margin:0 0 10px;padding-left:4px}
+.pr{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,auto);gap:4px 14px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center}
+.pr .v{font:500 15px "DM Mono",monospace;text-align:right;white-space:nowrap}.pr .v.lo{color:var(--tom)}.pr small{grid-column:1/-1;color:var(--mute)}
+.ch{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.days{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));margin:12px 0 18px}
+.day{border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--paper)}.day.today{border-color:var(--leaf);box-shadow:inset 4px 0 0 var(--leaf)}
+.day h4{margin:0 0 4px;font-size:15px}.pe{display:flex;align-items:center;gap:8px;padding:2px 0}.pe .link{text-align:left;flex:1 1 auto;justify-content:flex-start}
+.x{min-height:36px;width:36px;padding:0;border-radius:18px;flex:none}
+.sp{font:600 11px Inter,sans-serif;color:#fff;background:var(--tom);border-radius:6px;padding:0 5px;margin-left:6px}
+li.card{cursor:default}li.card .s{grid-column:1/-1}
+.hero{width:calc(100% + 2*clamp(16px,4vw,30px));margin:-22px calc(-1*clamp(16px,4vw,30px)) 16px;aspect-ratio:16/9;object-fit:cover;display:block;background:var(--soft)}
+.thumb{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--soft);grid-row:span 2}
+.card.has-img{grid-template-columns:64px minmax(0,1fr) auto}
+.live{font:600 11px Inter,sans-serif;color:#fff;background:var(--leaf);border-radius:6px;padding:0 5px;margin-left:6px}
+.res{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer;width:100%;text-align:left;background:none;border-left:0;border-right:0;border-top:0;border-radius:0;font:inherit;color:inherit;min-height:56px}
+.res img{width:48px;height:48px;object-fit:contain;background:#fff;border-radius:8px;grid-row:span 2}.res b{font-weight:500}.res .pp{font:500 15px "DM Mono",monospace;text-align:right;white-space:nowrap}.res small{color:var(--mute)}
+.find{margin-top:12px;border-top:1px dashed var(--line);padding-top:6px}
+.empty{text-align:center;padding:36px 10px;color:var(--mute)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;max-width:90vw;font-weight:500;z-index:9}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:r .8s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes r{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}}
+@media(max-width:600px){.g3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.g3 .w{grid-column:1/-1}.pr{grid-template-columns:repeat(3,minmax(0,1fr))}.pr>span:first-child{grid-column:1/-1}.pr .v{text-align:left}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Recipe Costs</h1>
+  <p>Your recipes, costed with live prices at your local supermarkets.</p>
+  <nav id="nav"><a href="#recipes">Recipes</a><a href="#plan">Plan</a><a href="#list">List</a><a href="#prices">Prices</a><a href="#stores">Stores</a></nav>
+</header>
+<main id="app"></main>
+<div id="toast" class="toast" hidden></div>
+<script>
+{
+const $=s=>document.querySelector(s);
+const app=$('#app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'$'+(Math.round(n*100)/100).toFixed(2);
+const key=n=>String(n||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'item';
+const clone=o=>JSON.parse(JSON.stringify(o));
+const CH=[{id:'pns',n:'Pak’nSave'},{id:'ww',n:'Woolworths'},{id:'nw',n:'New World'}];
+const dot=c=>`<span class="dot" style="background:var(--${c})"></span>`;
+const S={recipes:{},prices:{},st:{use:{pns:true,ww:false,nw:true},names:{},ids:{}},storeList:{},geo:null,find:null,sq:'',list:{recipes:{},checked:{}},view:'recipes',cur:null,serv:null,edit:null,pedit:null,meta:false,q:'',tag:'',pq:'',db:null,sample:null,loading:true,busy:'',note:'',draft:{src:'',text:''},plan:{weeks:{}},wk:null,pick:null,ideas:[],planPick:false};
+const HH={id:null};
+async function api(path,opt={}){const r=await fetch('/api'+path,{...opt,headers:{'content-type':'application/json',...(opt.headers||{})}});let js=null;try{js=await r.json()}catch(e){}if(!r.ok)throw new Error(js&&js.error||('Error '+r.status));return js}
+const EA_G={onion:150,'brown onion':150,'red onion':150,garlic:5,'garlic clove':5,carrot:100,potato:150,kumara:250,tomato:120,capsicum:160,lemon:100,lime:70,apple:150,banana:120,courgette:200,cucumber:350,avocado:170,'spring onion':15,egg:60,eggs:60};
+const chains=()=>CH.filter(c=>S.st.use[c.id]!==false);
+const sname=c=>S.st.names&&S.st.names[c.id]?S.st.names[c.id]:c.n;
+
+function flash(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(flash.t);flash.t=setTimeout(()=>t.hidden=true,3200)}
+
+const DOC={st:['settings','stores'],list:['settings','list'],plan:['settings','plan']};
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const monday=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-(x.getDay()+6)%7);return x};
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const dayLbl=d=>d.toLocaleDateString('en-NZ',{weekday:'short',day:'numeric',month:'short'});
+const season=d=>{const m=d.getMonth();return m>=11||m<=1?'summer':m<=4?'autumn':m<=7?'winter':'spring'};
+const SEASON={spring:['asparagus','broad beans','spinach','silverbeet','lettuce','spring onions','new potatoes','peas','rhubarb','strawberries','broccoli','cauliflower','cabbage','leeks','avocado'],
+ summer:['tomatoes','courgettes','corn','strawberries','blueberries','raspberries','cherries','peaches','nectarines','apricots','plums','cucumber','capsicum','green beans','lettuce','new potatoes','eggplant'],
+ autumn:['apples','pears','feijoas','pumpkin','kumara','mushrooms','cauliflower','broccoli','leeks','plums','beetroot','silverbeet','cabbage'],
+ winter:['pumpkin','kumara','cabbage','cauliflower','broccoli','leeks','carrots','parsnips','swede','mandarins','oranges','lemons','kiwifruit','silverbeet','brussels sprouts']};
+S.wk=monday(new Date());
+async function save(col,id,obj){
+  if(DOC[col])S[col]=obj;else S[col][id]=obj;
+  const [c,d]=DOC[col]||[col,id];
+  try{await api(`/hh/${HH.id}/doc/${c}/${encodeURIComponent(d)}`,{method:'PUT',body:JSON.stringify(obj)})}catch(e){flash('Could not save: '+e.message)}
+}
+async function drop(col,id){delete S[col][id];try{await api(`/hh/${HH.id}/doc/${col}/${encodeURIComponent(id)}`,{method:'DELETE'})}catch(e){flash('Could not delete that.')}}
+
+/* ---------- units & parsing ---------- */
+const U={g:['g',1],gm:['g',1],gram:['g',1],grams:['g',1],kg:['g',1000],kilogram:['g',1000],kilograms:['g',1000],oz:['g',28.35],lb:['g',453.6],lbs:['g',453.6],ml:['ml',1],l:['ml',1000],litre:['ml',1000],litres:['ml',1000],cup:['ml',250],cups:['ml',250],tbsp:['ml',15],tablespoon:['ml',15],tablespoons:['ml',15],tsp:['ml',5],teaspoon:['ml',5],teaspoons:['ml',5],pinch:['g',0.5]};
+const FR={'½':.5,'¼':.25,'¾':.75,'⅓':1/3,'⅔':2/3,'⅛':.125};
+function fq(a,b){if(b==='ea')return (Math.round(a*100)/100)+' ea';if(a>=1000)return (Math.round(a/10)/100)+(b==='g'?' kg':' L');return Math.round(a*10)/10+' '+b}
+function parseLine(line){
+  let s=line.replace(/[½¼¾⅓⅔⅛]/g,m=>' '+FR[m]+' ').replace(/\s+/g,' ').trim(),q=0,m,n=0;
+  while(n<2&&(m=s.match(/^(\d+\/\d+|\d+(?:\.\d+)?)\s*/))){const t=m[1];q+=t.includes('/')?(+t.split('/')[0]/ +t.split('/')[1]):+t;s=s.slice(m[0].length);n++}
+  s=s.replace(/^[-–]\s*\d+(?:\.\d+)?\s*/,'').replace(/^x\s+/i,'');
+  let base='ea',amt=q,w=(s.split(' ')[0]||'').toLowerCase().replace(/\.$/,'');
+  if(q&&U[w]){base=U[w][0];amt=q*U[w][1];s=s.slice(s.split(' ')[0].length).trim()}
+  const name=s.replace(/\(.*?\)/g,'').split(',')[0].replace(/^of\s+/i,'').trim().toLowerCase();
+  return {line:line.trim(),name:name||line.trim().toLowerCase(),amount:amt||0,base,skip:!q||/to taste|for serving|optional/i.test(line)};
+}
+function localParse(text,src){
+  const L=text.split(/\n/).map(x=>x.trim()).filter(Boolean);
+  const title=(L.find(x=>!/^[-•*\d½¼¾⅓⅔]/.test(x))||'Untitled recipe').slice(0,90);
+  const mi=L.findIndex(x=>/^(method|directions|instructions|steps)\b/i.test(x));
+  const ingL=(mi>0?L.slice(0,mi):L).filter(x=>/^([-•*]\s*)?[\d½¼¾⅓⅔⅛]/.test(x));
+  return {title,servings:+((text.match(/serves\s*(\d+)/i)||[])[1])||4,source:src,ingredients:ingL.map(x=>parseLine(x.replace(/^[-•*]\s*/,''))),method:mi>=0?L.slice(mi+1).map(x=>x.replace(/^(\d+[.)]|[-•*])\s*/,'')):[],tags:[],notes:''};
+}
+
+/* ---------- Claude helpers ---------- */
+async function claudeParse(text,src){
+  const r=await S.sample.json(`Turn this pasted recipe into JSON. Return only {"title":string,"servings":number,"tags":string[],"ingredients":[{"line":string,"name":string,"amount":number,"base":"g"|"ml"|"ea","skip":boolean}],"method":string[]}.
+- line: the ingredient line as written.
+- name: short generic NZ supermarket product name, lowercase (e.g. "beef mince", "plain flour", "canned chopped tomatoes", "brown onion").
+- amount + base: quantity used, in grams ("g") for solids, millilitres ("ml") for liquids/oils, or count ("ea") for items sold singly (eggs, onions, garlic cloves, lemons). Convert cups/spoons of dry goods to grams with typical densities. NZ cup = 250 ml, tbsp = 15 ml, tsp = 5 ml. A whole can/jar/packet: its stated weight in g.
+- Unquantified items like "cooking oil": a sensible amount (e.g. 15 ml).
+- skip: true only for water and "salt and pepper to taste".
+- servings: lowest number if a range; 4 if not stated.
+- tags: 1-3 short lowercase tags such as "dinner", "beef", "baking".
+- method: the steps as written, one string each; [] if none given.
+Recipe:
+"""${text.slice(0,14000)}"""`,{modelTier:'quick'});
+  if(!r||!Array.isArray(r.ingredients))throw new Error('bad');
+  return {title:String(r.title||'Untitled recipe').slice(0,90),servings:+r.servings||4,source:src,tags:Array.isArray(r.tags)?r.tags.map(String).slice(0,4):[],notes:'',method:Array.isArray(r.method)?r.method.map(String):[],
+    ingredients:r.ingredients.map(i=>({line:String(i.line||i.name||''),name:String(i.name||'').toLowerCase(),amount:+i.amount||0,base:['g','ml','ea'].includes(i.base)?i.base:'ea',skip:!!i.skip}))};
+}
+const storeOf=c=>S.st.ids&&S.st.ids[c];
+const liveChains=()=>['pns','nw'].filter(c=>S.st.use[c]!==false&&storeOf(c));
+function pick(res,ing){
+  const ok=res.filter(r=>r.price>0);if(!ok.length)return null;
+  const same=ok.find(r=>r.base===ing.base)||(ing.base!=='ea'?ok.find(r=>r.base!=='ea'):null)||(ing.base==='ea'&&eaG(ing.name)?ok.find(r=>r.base==='g'):null);
+  return same||ok[0];
+}
+function linkEntry(r,c){return {price:r.price,size:r.size,base:r.base,pid:r.pid,pname:r.name,img:r.img,store:storeOf(c),live:true,deal:r.deal||'',units:r.units,updated:Date.now()}}
+async function linkProduct(k,name,base,c,r){const p=clone(S.prices[k]||{name,base:r.base||base});p.name=p.name||name;if(!p.base)p.base=r.base;p[c]=linkEntry(r,c);await save('prices',k,p)}
+async function fillPrices(ings){
+  const ch=liveChains();
+  if(!ch.length){flash('Choose your Pak’nSave or New World on the Stores tab first.');location.hash='stores';return 0}
+  const todo=[],seen={};
+  for(const i of ings){if(i.skip)continue;const k=key(i.name);if(seen[k])continue;seen[k]=1;const p=S.prices[k];
+    for(const c of ch)if(!(p&&p[c]&&p[c].live&&p[c].store===storeOf(c)))todo.push({i,k,c})}
+  if(!todo.length){flash('Everything already has live prices.');return 0}
+  S.busy='prices';render(true);let n=0;
+  try{for(const t of todo.slice(0,30)){
+      try{const res=await api(`/search?chain=${t.c}&store=${storeOf(t.c)}&q=${encodeURIComponent(t.i.name)}`);const r=pick(res,t.i);if(r){await linkProduct(t.k,t.i.name,t.i.base,t.c,r);n++;render()}}catch(e){}
+    }}
+  finally{S.busy='';render(true)}
+  if(todo.length>30)flash('Matched '+n+'. Tap again for the rest.');else flash(n?`Found ${n} live price${n>1?'s':''}. Tap an item to change the product.`:'No matches found. Tap an item to search yourself.');
+  return n;
+}
+async function refreshLive(keys){
+  const ks=keys.filter(k=>S.prices[k]&&['pns','nw'].some(c=>S.prices[k][c]&&S.prices[k][c].live));if(!ks.length)return;
+  S.busy='refresh';render(true);
+  try{const r=await api(`/hh/${HH.id}/refresh`,{method:'POST',body:JSON.stringify({keys:ks})});Object.assign(S.prices,r.prices||{});flash(r.refreshed?`Updated ${r.refreshed} price${r.refreshed>1?'s':''}.`:'Prices are up to date.')}
+  catch(e){flash('Could not refresh: '+e.message)}finally{S.busy='';render(true)}
+}
+function vFind(k,name,base){
+  const f=S.find&&S.find.k===k?S.find:null,ch=liveChains();
+  if(!ch.length)return `<div class="find"><p class="hint">Choose your local Pak’nSave or New World on the <a href="#stores">Stores</a> tab to search live prices.</p></div>`;
+  return `<div class="find"><p style="margin:6px 0;font-weight:600">Live prices</p><div class="row">${ch.map(c=>`<button type="button" data-find="${c}" data-k="${esc(k)}" data-n="${esc(name)}" data-b="${esc(base)}">${dot(c)}Search ${esc(CH.find(x=>x.id===c).n)}</button>`).join('')}</div>
+  ${f?`<div class="row" style="margin-top:8px"><input id="fq" value="${esc(f.q)}" aria-label="Search term" style="flex:1 1 160px"><button type="button" data-act="findgo">Search</button></div>
+    ${f.loading?'<p><span class="spin"></span>Searching…</p>':f.err?`<p class="hint">${esc(f.err)}</p>`:`<div>${(f.res||[]).map((r,ix)=>`<button type="button" class="res" data-pickres="${ix}">${r.img?`<img src="${esc(r.img)}" alt="" loading="lazy">`:'<span></span>'}<b>${esc(r.name)}</b><span class="pp">${money(r.price)}${r.weight?'/kg':''}</span><small>${esc(r.units)}${r.unitPrice?' · '+esc(r.unitPrice):''}${r.deal?` <span class="sp">${esc(r.deal)}</span>`:''}</small></button>`).join('')||'<p class="hint">No results. Try a simpler word.</p>'}</div>`}`:''}</div>`;
+}
+/* ---------- costing ---------- */
+const eaG=name=>{const n=String(name||'').toLowerCase();return EA_G[n]||EA_G[n.replace(/s$/,'')]||Object.entries(EA_G).find(([k])=>n.endsWith(k))?.[1]||null};
+function lineAt(it,cid){const p=S.prices[it.key],q=p&&p[cid];
+  if(!q||!(+q.size>0)||!(+q.price>0))return null;
+  const b=q.base||p.base;let amt=it.amt,approx=false;
+  if(b!==it.base){
+    if(b!=='ea'&&it.base!=='ea')approx=true;
+    else if(it.base==='ea'&&b==='g'&&eaG(it.name)){amt=it.amt*eaG(it.name);approx=true}
+    else return null}
+  return {c:amt/ +q.size* +q.price,q,approx,b};}
+function costItems(items){
+  const ch=chains(),tot={},miss={},groups={},un=[];let split=0;
+  for(const c of ch){tot[c.id]=0;miss[c.id]=0;groups[c.id]=[]}
+  for(const it of items){let best=null;
+    for(const c of ch){const l=lineAt(it,c.id);if(!l){miss[c.id]++;continue}tot[c.id]+=l.c;if(!best||l.c<best.l.c)best={c:c.id,l}}
+    if(best){split+=best.l.c;groups[best.c].push({it,l:best.l})}else un.push(it)}
+  return {ch,tot,miss,groups,un,split};
+}
+const itemsOf=(r,serv)=>{const m=serv/(+r.servings||1);return r.ingredients.map((i,ix)=>({ix,key:key(i.name),name:i.name,base:i.base,amt:(+i.amount||0)*m,label:i.line,skip:i.skip}))};
+
+/* ---------- views ---------- */
+function vRecipes(){
+  const all=Object.entries(S.recipes),tags=[...new Set(all.flatMap(([,r])=>r.tags||[]))].sort();
+  const q=S.q.toLowerCase();
+  const rs=all.filter(([,r])=>(!S.tag||(r.tags||[]).includes(S.tag))&&(!q||r.title.toLowerCase().includes(q)||r.ingredients.some(i=>i.name.includes(q)))).sort((a,b)=>(b[1].created||0)-(a[1].created||0));
+  let h=`<div class="row" style="justify-content:space-between"><h2 class="v">Recipes</h2><a class="btn go" href="#add">Add recipe</a></div>`;
+  if(S.note)h+=`<p class="warn">${esc(S.note)}</p>`;
+  if(S.loading&&!all.length)return h+`<p class="empty"><span class="spin"></span>Loading your recipes…</p>`;
+  if(!all.length)return h+`<div class="empty"><h3>No recipes yet</h3><p>Paste one in and it gets costed at each of your supermarkets.</p></div>`;
+  h+=`<input id="q" type="search" placeholder="Search recipes or ingredients" value="${esc(S.q)}" style="margin-top:12px">`;
+  if(tags.length)h+=`<div class="chips">${['',...tags].map(t=>`<button class="chip" data-tag="${esc(t)}" aria-pressed="${S.tag===t}">${t?esc(t):'All'}</button>`).join('')}</div>`;
+  return h+`<ul class="list" style="margin-top:12px">${rs.map(([id,r])=>{const c=costItems(itemsOf(r,+r.servings||1).filter(i=>!i.skip));
+    const best=c.ch.filter(x=>!c.miss[x.id]).sort((a,b)=>c.tot[a.id]-c.tot[b.id])[0];
+    return `<li><button class="card${r.image?' has-img':''}" data-open="${esc(id)}">${r.image?`<img class="thumb" src="${esc(r.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}<h3>${esc(r.title)}</h3><span class="p">${money(c.split)}</span>
+    <span class="s">Serves ${esc(r.servings)} · ${money(c.split/(+r.servings||1))} a serve${best?` · cheapest at <b>${esc(best.n)}</b>`:''}${c.un.length?` · ${c.un.length} unpriced`:''}</span>
+    ${(r.tags||[]).length?`<span style="grid-column:${r.image?'2':'1'}/-1">${r.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</span>`:''}</button></li>`}).join('')||'<p class="empty">No match.</p>'}</ul>`;
+}
+function vItemEd(i){
+  const p=S.prices[key(i.name)]||{base:i.base};
+  return `<form class="ed" data-form="ing"><div class="g3"><div class="w"><label for="e-n">Product</label><input id="e-n" name="name" value="${esc(i.name)}"></div>
+  <div><label for="e-a">Amount used</label><input id="e-a" name="amount" type="number" step="any" inputmode="decimal" value="${esc(i.amount)}"></div><div><label for="e-b">Unit</label><select id="e-b" name="base">${opts(i.base)}</select></div></div>
+  ${priceGrid(p)}
+  <label class="chk"><input type="checkbox" name="skip"${i.skip?' checked':''}> Leave out (already in the pantry)</label>
+  ${vFind(key(i.name),i.name,i.base)}
+  <div class="row" style="margin-top:12px"><button class="go">Save</button><button type="button" data-act="cancel">Cancel</button></div></form>`;
+}
+const opts=b=>['g','ml','ea'].map(u=>`<option${u===b?' selected':''}>${u}</option>`).join('');
+function priceGrid(p){
+  return `<label for="e-pb">Pack prices, sold by</label><select id="e-pb" name="pbase" style="max-width:120px">${opts(p.base||'g')}</select>
+  <div class="pg"><span class="h">Store</span><span class="h">Pack price $</span><span class="h">Pack size</span><span class="h">Special</span>
+  ${CH.map(c=>{const q=p[c.id]||{};return `<span>${dot(c.id)}${esc(c.n)}${q.est?'<span class="est">est.</span>':''}</span><input aria-label="${esc(c.n)} price" name="${c.id}p" type="number" step="any" inputmode="decimal" value="${esc(q.price??'')}"><input aria-label="${esc(c.n)} pack size" name="${c.id}s" type="number" step="any" inputmode="decimal" value="${esc(q.size??'')}"><input class="ck" type="checkbox" aria-label="${esc(c.n)} on special" name="${c.id}x"${q.sp?' checked':''}>`}).join('')}</div>`;
+}
+function readPrices(d,name,old){
+  const p={name,base:d.pbase};
+  for(const c of CH){const pr=+d[c.id+'p'],sz=+d[c.id+'s'];if(pr>0&&sz>0){const o=old&&old[c.id];p[c.id]=o&&o.live&&+o.price===pr&&+o.size===sz?{...o,sp:!!d[c.id+'x']}:{price:pr,size:sz,est:!!(o&&o.est&&+o.price===pr&&+o.size===sz&&old.base===d.pbase),sp:!!d[c.id+'x']}}}
+  return p;
+}
+function vGroups(c,attr,lead,after,done){
+  const row=(x,miss)=>{const it=x.it||x;return `<li class="it${done&&done(it)?' done':''}">${lead?lead(it):''}<button ${attr(it)}><span class="nm">${esc(it.label)}</span><span class="c${miss?' miss':''}">${miss?'Add price':money(x.l.c)}</span><small>${miss?'no price yet':`${fq(it.amt,it.base)}${x.l.approx?' (≈)':''} of ${fq(+x.l.q.size,x.l.b)} @ ${money(+x.l.q.price)}${x.l.q.live?'<span class="live">live</span>':''}${x.l.q.est?'<span class="est">est.</span>':''}${x.l.q.sp||x.l.q.deal?`<span class="sp">${esc(x.l.q.deal||'special')}</span>`:''}`}${x.l.q.pname?`<br>${esc(x.l.q.pname)}`:''}</small></button>${after?after(it):''}</li>`};
+  let h=c.ch.filter(ch=>c.groups[ch.id].length).map(ch=>{const g=c.groups[ch.id],sub=g.reduce((a,x)=>a+x.l.c,0);
+    return `<div class="grp"><h4>${dot(ch.id)}${esc(sname(ch))}<span class="t">${money(sub)}</span></h4><ul class="list" style="gap:0">${g.map(x=>row(x)).join('')}</ul></div>`}).join('');
+  if(c.un.length)h+=`<div class="grp"><h4>No price yet</h4><ul class="list" style="gap:0">${c.un.map(it=>row(it,1)).join('')}</ul>
+    <p class="row" style="margin-top:10px">${S.busy==='prices'?'<span><span class="spin"></span>Estimating…</span>':`<button data-act="est">Find live prices</button>`}</p></div>`;
+  return h;
+}
+function vStoreRows(c,per){
+  const done=c.ch.filter(x=>!c.miss[x.id]),lo=done.length?Math.min(...done.map(x=>c.tot[x.id])):null;
+  return `<div class="stores">${c.ch.map(ch=>`<div class="st${!c.miss[ch.id]&&c.tot[ch.id]===lo&&done.length>1?' best':''}"><span class="nm">${dot(ch.id)}${esc(sname(ch))}</span><span class="m">${c.tot[ch.id]||!c.miss[ch.id]?money(c.tot[ch.id]):'—'}${c.miss[ch.id]?`<i>+${c.miss[ch.id]} unpriced</i>`:''}</span>${per?`<small>${money(c.tot[ch.id]/per)} a serve</small>`:''}</div>`).join('')}</div>
+  <div class="split"><span>Split shop</span><span class="big">${money(c.split)}</span><small>Each item where it’s cheapest${done.length&&Math.min(...done.map(x=>c.tot[x.id]))-c.split>0.005?`, saves ${money(Math.min(...done.map(x=>c.tot[x.id]))-c.split)} on the cheapest single store`:''}</small>${per?`<small style="text-align:right">${money(c.split/per)} a serve</small>`:''}</div>`;
+}
+function vDetail(){
+  const r=S.recipes[S.cur];if(!r){S.view='recipes';return vRecipes()}
+  const serv=S.serv||+r.servings||1,items=itemsOf(r,serv),c=costItems(items.filter(i=>!i.skip)),skips=items.filter(i=>i.skip);
+  let host='';try{host=r.source?new URL(r.source).hostname.replace(/^www\./,''):''}catch(e){}
+  const inList=S.list.recipes&&S.list.recipes[S.cur];
+  const edit=it=>`data-edit="${it.ix}" aria-expanded="${S.edit===it.ix}"`;
+  const groups=vGroups(c,edit,null,it=>S.edit===it.ix?vItemEd(r.ingredients[it.ix]):'');
+  return `<p><button class="link" data-act="back">← All recipes</button></p>
+  <article class="docket">${r.image?`<img class="hero" src="${esc(r.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`:''}<h2>${esc(r.title)}</h2>
+  ${host?`<div class="src">From <a href="${esc(r.source)}" target="_blank" rel="noopener">${esc(host)}</a>${r.image?' · photo from '+esc(host):''}</div>`:''}
+  ${(r.tags||[]).length?`<div style="margin-top:8px">${r.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
+  <div class="serv">Serves <button data-act="minus" aria-label="Fewer servings">−</button><b>${serv}</b><button data-act="plus" aria-label="More servings">+</button>${serv!==+r.servings?`<button class="link" data-act="reset">reset to ${esc(r.servings)}</button>`:''}</div>
+  ${vStoreRows(c,serv)}</article>
+  <div class="row" style="margin:16px 0"><button class="${inList?'':'go'}" data-act="tolist">${inList?'On shopping list ✓':'Add to shopping list'}</button><button data-act="toplan">Add to meal plan</button><button data-act="meta">Edit details</button></div>
+  <div class="row" style="margin:-4px 0 12px">${S.busy==='prices'?'<span><span class="spin"></span>Finding live prices…</span>':S.busy==='refresh'?'<span><span class="spin"></span>Refreshing…</span>':`<button data-act="est">Find live prices</button><button data-act="refresh">Refresh prices</button>`}${updatedLine(r)}</div>
+  ${S.planPick?`<div class="ed" style="padding-top:12px"><p style="margin:0 0 8px;font-weight:600">Week of ${S.wk.toLocaleDateString('en-NZ',{day:'numeric',month:'long'})}: pick a day</p><div class="row">${[...Array(7)].map((_,i)=>`<button data-planday="${i}">${dayLbl(addDays(S.wk,i))}</button>`).join('')}</div></div>`:''}
+  ${S.meta?vMeta(r):''}
+  <h3 class="s">Where to buy</h3><p class="hint" style="margin:0">Tap an item to fix the amount or enter the price you paid.</p>
+  ${groups}
+  ${skips.length?`<div class="grp"><h4>Left out</h4><ul class="list" style="gap:0">${skips.map(it=>`<li class="it skip"><button ${edit(it)}><span class="nm">${esc(it.label)}</span><span class="c">—</span></button>${S.edit===it.ix?vItemEd(r.ingredients[it.ix]):''}</li>`).join('')}</ul></div>`:''}
+  ${(r.method||[]).length?`<h3 class="s">Method</h3><ol class="meth">${r.method.map(m=>`<li>${esc(m)}</li>`).join('')}</ol>`:''}
+  <h3 class="s">Notes</h3><textarea id="notes" placeholder="Swaps, tips, who liked it…">${esc(r.notes||'')}</textarea>
+  <p class="hint">“live” prices come from your chosen Pak’nSave and New World and update daily. Prices marked est. are estimates; Woolworths prices are entered by you for now.</p>
+  <p><button data-act="del">Delete recipe</button></p>`;
+}
+function updatedLine(r){let t=0;for(const i of r.ingredients){const p=S.prices[key(i.name)];if(p)for(const c of ['pns','nw'])if(p[c]&&p[c].live&&p[c].updated)t=Math.max(t,p[c].updated)}
+  if(!t)return '';const m=Math.round((Date.now()-t)/60000);return `<span class="hint">Prices checked ${m<2?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' days ago'}</span>`}
+function vMeta(r){
+  return `<form class="ed" data-form="meta"><label for="m-t">Title</label><input id="m-t" name="title" value="${esc(r.title)}" required>
+  <div class="g3"><div><label for="m-s">Serves</label><input id="m-s" name="servings" type="number" min="1" value="${esc(r.servings)}"></div><div class="w" style="grid-column:span 2"><label for="m-g">Tags</label><input id="m-g" name="tags" value="${esc((r.tags||[]).join(', '))}" placeholder="dinner, beef"></div></div>
+  <label for="m-u">Recipe link</label><input id="m-u" name="source" type="url" value="${esc(r.source||'')}">
+  <label for="m-m">Method, one step per line</label><textarea id="m-m" name="method">${esc((r.method||[]).join('\n'))}</textarea>
+  <div class="row" style="margin-top:12px"><button class="go">Save</button><button type="button" data-act="meta">Cancel</button></div></form>`;
+}
+function vAdd(){
+  const d=S.draft;
+  return `<p><button class="link" data-act="back">← All recipes</button></p><h2 class="v">Add a recipe</h2>
+  <form data-form="import"><label for="a-s">Recipe link</label><div class="row"><input id="a-s" name="src" type="url" inputmode="url" placeholder="Paste a link to a recipe page" value="${esc(d.src)}" style="flex:1 1 220px"><button class="go"${S.busy==='import'?' disabled':''}>${S.busy==='import'?'<span class="spin"></span>Importing…':'Import'}</button></div>
+  <p class="hint">Works with most recipe sites. The title, photo, ingredients and method come in, then live prices are found at your stores.</p></form>
+  <details style="margin-top:22px"><summary style="cursor:pointer;font-weight:600;min-height:44px">Or paste the recipe text</summary>
+  <form data-form="add"><label for="a-t">Recipe text</label><textarea id="a-t" name="text" placeholder="Title, serves, ingredients (one per line, starting with the amount) and method">${esc(d.text)}</textarea>
+  <button class="go" style="margin-top:10px">Read recipe</button></form></details>`;
+}
+function vList(){
+  const L=S.list.recipes||{},ids=Object.keys(L).filter(id=>S.recipes[id]);
+  if(!ids.length)return `<h2 class="v">Shopping list</h2><p class="empty">Open a recipe and tap “Add to shopping list”. Everything gets combined here and split by the cheapest store.</p>`;
+  const c=costItems(aggregate(ids.map(id=>({id,serv:+L[id]||+S.recipes[id].servings}))));
+  const got=it=>!!(S.list.checked&&S.list.checked[it.key]);
+  const g=vGroups(c,it=>`data-pk="${esc(it.key)}"`,it=>`<input type="checkbox" class="ck" data-ck="${esc(it.key)}" aria-label="Got ${esc(it.name)}"${got(it)?' checked':''}>`,it=>S.pedit===it.key?vPriceEd(it.key):'',got);
+  return `<div class="row" style="justify-content:space-between"><h2 class="v">Shopping list</h2><button data-act="clear">Clear list</button></div>
+  <ul class="list" style="gap:6px;margin:10px 0">${ids.map(id=>`<li class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0"><button class="link" data-open="${esc(id)}">${esc(S.recipes[id].title)}</button><span class="serv" style="margin:0"><button data-ls="${esc(id)}" data-d="-1" aria-label="Fewer servings">−</button><b>${+L[id]}</b><button data-ls="${esc(id)}" data-d="1" aria-label="More servings">+</button></span></li>`).join('')}</ul>
+  <article class="docket">${vStoreRows(c,0)}</article>
+  <h3 class="s">Where to buy</h3><p class="hint" style="margin:0">Tick items off as you shop. Tap an item to update its prices.</p>${g}`;
+}
+function aggregate(entries){
+  const agg={};
+  for(const e of entries){const r=S.recipes[e.id];if(!r)continue;
+    for(const it of itemsOf(r,+e.serv||+r.servings)){if(it.skip)continue;const k=it.key+'|'+it.base;if(agg[k])agg[k].amt+=it.amt;else agg[k]={...it}}}
+  return Object.values(agg).map(a=>({...a,label:a.name.charAt(0).toUpperCase()+a.name.slice(1)+' · '+fq(a.amt,a.base)}));
+}
+const weekObj=()=>(S.plan.weeks&&S.plan.weeks[iso(S.wk)])||{};
+const weekEntries=()=>{const w=weekObj(),out=[];for(let i=0;i<7;i++)for(const e of (w['d'+i]||[]))if(S.recipes[e.id])out.push(e);return out};
+async function editWeek(fn){const p=clone(S.plan);p.weeks=p.weeks||{};const k=iso(S.wk);p.weeks[k]=p.weeks[k]||{};fn(p.weeks[k]);
+  const keep=Object.keys(p.weeks).sort().slice(-12),w={};for(const x of keep)w[x]=p.weeks[x];p.weeks=w;await save('plan',0,p)}
+function vPlan(){
+  const wk=weekObj(),entries=weekEntries(),c=costItems(aggregate(entries)),today=iso(new Date());
+  const ro=Object.entries(S.recipes).sort((a,b)=>a[1].title.localeCompare(b[1].title)).map(([id,r])=>`<option value="${esc(id)}">${esc(r.title)}</option>`).join('');
+  const days=[...Array(7)].map((_,i)=>{const d=addDays(S.wk,i),es=(wk['d'+i]||[]);
+    return `<div class="day${iso(d)===today?' today':''}"><h4>${dayLbl(d)}</h4>
+    ${es.map((e,j)=>S.recipes[e.id]?`<div class="pe"><button class="link" data-open="${esc(e.id)}">${esc(S.recipes[e.id].title)}</button><span class="hint">×${e.serv}</span><button class="x" data-unplan="${i}:${j}" aria-label="Remove ${esc(S.recipes[e.id].title)}">×</button></div>`:'').join('')}
+    ${S.pick===i?`<form class="ed" data-form="plan" data-day="${i}" style="margin:6px 0 0"><label for="pl-r">Recipe</label><select id="pl-r" name="id">${ro}</select><label for="pl-s">Serves</label><input id="pl-s" name="serv" type="number" min="1" placeholder="Same as recipe"><div class="row" style="margin-top:10px"><button class="go">Add</button><button type="button" data-act="unpick">Cancel</button></div></form>`
+      :Object.keys(S.recipes).length?`<button class="link" data-pick="${i}">+ Add a meal</button>`:''}</div>`}).join('');
+  return `<div class="row" style="justify-content:space-between"><h2 class="v">Meal plan</h2><span class="row"><button data-wk="-1" aria-label="Previous week">‹</button><button data-wk="0">This week</button><button data-wk="1" aria-label="Next week">›</button></span></div>
+  <p class="hint" style="margin:4px 0 0">Week of ${S.wk.toLocaleDateString('en-NZ',{day:'numeric',month:'long'})}</p>
+  ${Object.keys(S.recipes).length?'':'<p class="warn">Add some recipes first, then plan them here.</p>'}
+  <div class="days">${days}</div>
+  ${entries.length?`<h3 class="s">This week’s food bill</h3><article class="docket" style="margin-top:6px">${vStoreRows(c,0)}</article><div class="row"><button class="go" data-act="wk2list">Add this week to shopping list</button></div>`:''}
+  ${vIdeas(entries)}`;
+}
+const specials=()=>Object.entries(S.prices).filter(([,p])=>p&&CH.some(c=>p[c.id]&&(p[c.id].sp||(p[c.id].deal&&p[c.id].live)))).map(([k])=>k);
+function vIdeas(entries){
+  const se=season(addDays(S.wk,3)),prod=SEASON[se],sp=new Set(specials()),planned=new Set(entries.map(e=>e.id));
+  const norm=x=>x.toLowerCase().replace(/(es|s)\b/g,'');
+  const scored=Object.entries(S.recipes).filter(([id])=>!planned.has(id)).map(([id,r])=>{const why=[];let sc=0;const ings=r.ingredients.filter(i=>!i.skip);
+    const sea=[...new Set(ings.flatMap(i=>prod.filter(p=>norm(i.name).includes(norm(p)))))];if(sea.length){sc+=3*sea.length;why.push(sea.join(', ')+' in season')}
+    const spec=[...new Set(ings.filter(i=>sp.has(key(i.name))).map(i=>i.name))];if(spec.length){sc+=3*spec.length;why.push(spec.join(', ')+' on special')}
+    const c=costItems(itemsOf(r,+r.servings).filter(i=>!i.skip)),per=c.split/(+r.servings||1);if(!c.un.length&&per>0){sc+=Math.max(0,5-per);why.push(money(per)+' a serve')}
+    return {id,r,sc,why}}).filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc).slice(0,5);
+  return `<h3 class="s">Ideas for ${se}</h3><p class="hint" style="margin:0 0 10px">In season in NZ: ${prod.slice(0,10).join(', ')}.${sp.size?` On special: ${[...sp].slice(0,8).map(k=>esc(S.prices[k].name)).join(', ')}.`:' Tick “Special” on a price and it counts here.'}</p>
+  ${scored.length?`<p style="margin:0 0 8px;font-weight:600">From your recipes</p><ul class="list">${scored.map(x=>`<li class="card"><h3>${esc(x.r.title)}</h3><button data-quick="${esc(x.id)}">Add to week</button><span class="s">${esc(x.why.join(' · '))}</span></li>`).join('')}</ul>`:''}
+  ${S.sample?`<div class="row" style="margin-top:14px">${S.busy==='ideas'?'<span><span class="spin"></span>Thinking up ideas…</span>':`<button data-act="ideas">${S.ideas.length?'More new ideas':'New recipe ideas from Claude'}</button>`}</div>`:''}
+  ${S.ideas.map((d,i)=>`<div class="ed" style="margin-top:12px;padding-top:14px"><h3 style="font-size:19px">${esc(d.title)}</h3><p class="hint" style="margin:4px 0">${esc(d.why||'')}</p><p style="margin:6px 0;font-size:15px">${d.ingredients.map(x=>esc(x.line)).join(' · ')}</p>${d.saved?'<span class="hint">Saved to your recipes ✓</span>':`<button class="go" data-idea="${i}">Save recipe</button>`}</div>`).join('')}`;
+}
+async function getIdeas(){
+  const se=season(addDays(S.wk,3)),sp=specials().map(k=>S.prices[k].name),titles=Object.values(S.recipes).map(r=>r.title).slice(0,40);
+  S.busy='ideas';render(true);
+  try{
+    const r=await S.sample.json(`Suggest 4 budget-friendly family dinner recipes for a New Zealand household this ${se}. Feature produce in season in NZ now (${SEASON[se].join(', ')})${sp.length?` and these products on special at the supermarket this week: ${sp.join(', ')}`:''}. Use ingredients easy to buy at Pak'nSave, Woolworths or New World. Don't repeat these recipes they already have: ${JSON.stringify(titles)}.
+Return only a JSON array of {"title":string,"why":string (one short sentence on why it suits this week),"servings":number,"tags":string[],"ingredients":[{"line":string,"name":string,"amount":number,"base":"g"|"ml"|"ea"}],"method":string[]}.
+Ingredient rules: line is how a recipe would list it; name is a short generic supermarket product name, lowercase; amount in g for solids, ml for liquids, count ("ea") for items sold singly; NZ cup = 250 ml.`,{modelTier:'default'});
+    const ok=(Array.isArray(r)?r:[]).filter(x=>x&&x.title&&Array.isArray(x.ingredients)).slice(0,4).map(x=>({title:String(x.title).slice(0,90),why:String(x.why||''),servings:+x.servings||4,tags:Array.isArray(x.tags)?x.tags.map(String).slice(0,3):[],method:Array.isArray(x.method)?x.method.map(String):[],
+      ingredients:x.ingredients.map(i=>({line:String(i.line||i.name||''),name:String(i.name||'').toLowerCase(),amount:+i.amount||0,base:['g','ml','ea'].includes(i.base)?i.base:'ea',skip:false}))}));
+    if(!ok.length)flash('No ideas came back. Try again.');S.ideas=ok;
+  }catch(e){flash(e&&e.code==='rate_limited'?'Claude is busy, try again shortly.':'Could not get ideas.')}
+  finally{S.busy='';render(true)}
+}
+function vPriceEd(k){
+  const p=S.prices[k]||{name:'',base:'g'};
+  return `<form class="ed" data-form="price" data-k="${esc(k)}"><label for="p-n">Product</label><input id="p-n" name="name" value="${esc(p.name)}" required>${priceGrid(p)}${k!=='__new'?vFind(k,p.name,p.base):''}
+  <div class="row" style="margin-top:12px"><button class="go">Save</button><button type="button" data-act="pcancel">Cancel</button>${S.prices[k]?`<button type="button" data-act="pdel">Delete</button>`:''}</div></form>`;
+}
+function vPrices(){
+  const q=S.pq.toLowerCase(),ps=Object.entries(S.prices).filter(([,p])=>p&&p.name&&(!q||p.name.includes(q))).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const cell=(p,c,lo)=>{const v=p[c.id];if(!v||!(+v.price>0))return `<span class="v" style="color:var(--mute)">${dot(c.id)}—</span>`;return `<span class="v${lo===c.id?' lo':''}">${dot(c.id)}${money(+v.price)}${v.est?'*':''}${v.sp?'<span class="sp">sp</span>':''}</span>`};
+  return `<h2 class="v">Prices</h2><p class="hint">One entry per product, shared by every recipe. Change a price and every recipe updates. * marks estimates. Tap a product to link it to a live supermarket product.</p>
+  <div class="row"><input id="pq" type="search" placeholder="Search products" value="${esc(S.pq)}" style="flex:1 1 200px"><button data-act="padd">Add product</button></div>
+  ${S.pedit==='__new'?vPriceEd('__new'):''}
+  ${ps.length?`<div style="margin-top:8px">${ps.map(([k,p])=>{if(S.pedit===k)return vPriceEd(k);
+    let lo=null,lv=1e9;for(const c of CH){const v=p[c.id];if(v&&+v.size>0&&+v.price>0){const u=+v.price/ +v.size;if(u<lv){lv=u;lo=c.id}}}
+    const sz=CH.map(c=>p[c.id]&&p[c.id].size?fq(+p[c.id].size,p.base):'').filter(Boolean);
+    return `<div class="pr" role="button" tabindex="0" data-p="${esc(k)}"><span>${esc(p.name)}</span>${CH.map(c=>cell(p,c,lo)).join('')}<small>${[...new Set(sz)].join(' / ')} packs${lo?` · best value at ${esc(CH.find(c=>c.id===lo).n)}`:''}</small></div>`}).join('')}</div>`:`<p class="empty">${S.pq?'No match.':'Prices appear here as you add recipes.'}</p>`}`;
+}
+const dist=(a,b)=>{const R=6371,t=x=>x*Math.PI/180,dl=t(b.lat-a.lat),dg=t(b.lng-a.lng),h=Math.sin(dl/2)**2+Math.cos(t(a.lat))*Math.cos(t(b.lat))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
+async function loadStores(){for(const c of ['pns','nw'])if(!S.storeList[c])api('/stores?chain='+c).then(L=>{S.storeList[c]=L;if(S.view==='stores')render()}).catch(()=>{S.storeList[c]=[];})}
+function vStores(){
+  const sel=c=>{const L=S.storeList[c];if(!L)return `<p class="hint"><span class="spin"></span>Loading stores…</p>`;
+    let arr=L.filter(x=>x.lat&&x.lng||!S.geo);if(S.geo)arr=arr.map(x=>({...x,km:dist(S.geo,x)})).sort((a,b)=>a.km-b.km);
+    return `<select name="id_${c}" aria-label="Your ${esc(CH.find(x=>x.id===c).n)} store"><option value="">Choose your store</option>${arr.map(x=>`<option value="${esc(x.id)}"${S.st.ids&&S.st.ids[c]===x.id?' selected':''}>${esc(x.name)}${x.km!=null?` · ${x.km.toFixed(1)} km`:''}</option>`).join('')}</select>`};
+  const share=location.origin+'/?h='+HH.id;
+  return `<h2 class="v">My stores</h2><p class="hint">Pick your local stores. Live prices come from the stores you choose.</p>
+  <button type="button" data-act="geo" style="margin:8px 0 4px">${S.geo?'Sorted by distance ✓':'Sort by nearest to me'}</button>
+  <form data-form="stores">${CH.map(c=>`<div class="ch"><label class="chk" style="margin:0"><input type="checkbox" name="u_${c.id}"${S.st.use[c.id]!==false?' checked':''}>${dot(c.id)}${esc(c.n)}</label><span></span><span></span>
+  ${c.id==='ww'?`<p class="hint" style="margin:0">Live Woolworths prices need one more setup step. Until then, enter Woolworths prices yourself.</p>`:sel(c.id)}</div>`).join('')}
+  <div class="row" style="margin-top:16px"><button class="go">Save stores</button></div></form>
+  <h3 class="s">Share with your household</h3><p class="hint" style="margin:0 0 8px">Anyone with this link sees and edits the same recipes, meal plan and shopping list.</p>
+  <div class="row"><input readonly value="${esc(share)}" aria-label="Household link" style="flex:1 1 220px"><button data-act="copyhh">Copy link</button></div>
+  <p class="hint">On your phone, open the app and choose “Add to Home Screen” to use it like an app.</p>`;
+}
+function vWelcome(){return `<div class="empty" style="color:var(--ink)"><h2 class="v">Welcome</h2><p>Cost your recipes with live prices from your local Pak’nSave and New World, plan your week and shop the cheapest way.</p>
+  <button class="go" data-act="newhh">Start my household</button><p class="hint">Already set up? Open the household link someone shared with you.</p></div>`}
+let pend=false;
+function render(force){
+  const a=document.activeElement;
+  if(!force&&a&&app.contains(a)&&a.matches('input,textarea,select')){pend=true;return}
+  pend=false;
+  const cur='#'+(S.view==='detail'||S.view==='add'?'recipes':S.view);
+  const n=Object.keys(S.list.recipes||{}).filter(id=>S.recipes[id]).length;
+  for(const l of document.querySelectorAll('#nav a')){if(l.hash===cur)l.setAttribute('aria-current','page');else l.removeAttribute('aria-current');
+    if(l.hash==='#list')l.innerHTML='List'+(n?`<span class="n">${n}</span>`:'')}
+  app.innerHTML=!HH.id?vWelcome():S.view==='add'?vAdd():S.view==='prices'?vPrices():S.view==='stores'?vStores():S.view==='list'?vList():S.view==='plan'?vPlan():S.view==='detail'?vDetail():vRecipes();
+}
+app.addEventListener('focusout',e=>{
+  if(e.target.id==='notes'){const r=S.recipes[S.cur];if(r&&(r.notes||'')!==e.target.value){const o=clone(r);o.notes=e.target.value;save('recipes',S.cur,o)}}
+  setTimeout(()=>{if(pend)render()},50)});
+function route(){const h=location.hash.slice(1);S.view=['add','prices','stores','list','plan'].includes(h)?h:(S.cur&&h==='recipe'?'detail':'recipes');S.edit=null;S.pedit=null;S.meta=false;S.pick=null;S.planPick=false;S.find=null;if(S.view==='stores'&&HH.id)loadStores();render(true);scrollTo(0,0)}
+addEventListener('hashchange',route);
+
+const refocus=(id,v)=>{const el=$('#'+id);if(el){el.focus();el.setSelectionRange(v,v)}};
+app.addEventListener('input',e=>{const t=e.target;
+  if(t.id==='q'){S.q=t.value;const p=t.selectionStart;render(true);refocus('q',p)}
+  else if(t.id==='pq'){S.pq=t.value;const p=t.selectionStart;render(true);refocus('pq',p)}
+  else if(t.form&&(t.form.dataset.form==='add'||t.form.dataset.form==='import'))S.draft[t.name]=t.value;
+  else if(t.id==='fq'&&S.find)S.find.q=t.value;
+  else if(t.id==='sq'){S.sq=t.value;const p=t.selectionStart;render(true);refocus('sq',p)}});
+app.addEventListener('keydown',e=>{const p=e.target.closest('[data-p]');if(p&&(e.key==='Enter'||e.key===' ')){e.preventDefault();p.click()}});
+app.addEventListener('click',async e=>{
+  const ck=e.target.closest('[data-ck]');
+  if(ck){e.stopPropagation();const l=clone(S.list);l.checked=l.checked||{};if(ck.checked)l.checked[ck.dataset.ck]=true;else delete l.checked[ck.dataset.ck];await save('list',0,l);render(true);return}
+  const t=e.target.closest('[data-open],[data-edit],[data-act],[data-p],[data-pk],[data-tag],[data-ls],[data-pick],[data-unplan],[data-wk],[data-quick],[data-idea],[data-planday],[data-find],[data-pickres]');if(!t)return;
+  if(t.dataset.find){S.find={k:t.dataset.k,name:t.dataset.n,base:t.dataset.b,c:t.dataset.find,q:t.dataset.n,res:null,loading:true};render(true);await runFind();return}
+  if(t.dataset.pickres!=null){const f=S.find,r=f&&f.res&&f.res[+t.dataset.pickres];if(!r)return;await linkProduct(f.k,f.name,f.base,f.c,r);S.find=null;flash('Linked to '+r.name);render(true);return}
+  if(t.dataset.pick!=null){S.pick=+t.dataset.pick;render(true);return}
+  if(t.dataset.wk!=null){const d=+t.dataset.wk;S.wk=d?addDays(S.wk,7*d):monday(new Date());S.pick=null;S.ideas=[];render(true);return}
+  if(t.dataset.unplan){const [i,j]=t.dataset.unplan.split(':').map(Number);await editWeek(w=>{(w['d'+i]||[]).splice(j,1)});render(true);return}
+  if(t.dataset.quick){const id=t.dataset.quick,w=weekObj();let i=[...Array(7).keys()].find(k=>!(w['d'+k]||[]).length);if(i==null)i=0;
+    await editWeek(x=>{(x['d'+i]=x['d'+i]||[]).push({id,serv:+S.recipes[id].servings||4})});flash('Added to '+dayLbl(addDays(S.wk,i)));render(true);return}
+  if(t.dataset.planday!=null){const i=+t.dataset.planday,r=S.recipes[S.cur];await editWeek(x=>{(x['d'+i]=x['d'+i]||[]).push({id:S.cur,serv:S.serv||+r.servings})});S.planPick=false;flash('Added to '+dayLbl(addDays(S.wk,i)));render(true);return}
+  if(t.dataset.idea!=null){const d=S.ideas[+t.dataset.idea];if(!d||d.saved)return;const r={title:d.title,servings:d.servings,tags:[...d.tags,'idea'],notes:'',method:d.method,source:'',ingredients:d.ingredients,created:Date.now()};
+    const id='r'+Date.now().toString(36);d.saved=true;await save('recipes',id,r);flash('Saved to your recipes.');render(true);fillPrices(r.ingredients);return}
+  if(t.dataset.open){S.cur=t.dataset.open;S.serv=null;S.edit=null;S.meta=false;if(location.hash==='#recipe')route();else location.hash='recipe';return}
+  if(t.dataset.tag!=null){S.tag=t.dataset.tag;render(true);return}
+  if(t.dataset.edit!=null){const ix=+t.dataset.edit;S.edit=S.edit===ix?null:ix;render(true);return}
+  if(t.dataset.p){S.pedit=t.dataset.p;render(true);return}
+  if(t.dataset.pk){S.pedit=S.pedit===t.dataset.pk?null:t.dataset.pk;render(true);return}
+  if(t.dataset.ls){const l=clone(S.list),id=t.dataset.ls;l.recipes[id]=Math.max(1,(+l.recipes[id]||1)+ +t.dataset.d);await save('list',0,l);render(true);return}
+  const a=t.dataset.act,r=S.recipes[S.cur];
+  if(a==='back')location.hash='recipes';
+  else if(a==='plus'){S.serv=(S.serv||+r.servings)+1;render(true)}
+  else if(a==='minus'){S.serv=Math.max(1,(S.serv||+r.servings)-1);render(true)}
+  else if(a==='reset'){S.serv=null;render(true)}
+  else if(a==='cancel'){S.edit=null;render(true)}
+  else if(a==='meta'){S.meta=!S.meta;render(true)}
+  else if(a==='toplan'){S.planPick=!S.planPick;render(true)}
+  else if(a==='findgo'){if(S.find){S.find.loading=true;render(true);await runFind()}}
+  else if(a==='geo'){if(!navigator.geolocation){flash('Location isn’t available on this device.');return}navigator.geolocation.getCurrentPosition(p=>{S.geo={lat:p.coords.latitude,lng:p.coords.longitude};render(true)},()=>flash('Couldn’t get your location. Pick your store from the list.'),{timeout:10000})}
+  else if(a==='copyhh'){try{await navigator.clipboard.writeText(location.origin+'/?h='+HH.id);flash('Link copied.')}catch(e){flash('Copy failed. Press and hold the link to copy it.')}}
+  else if(a==='newhh'){try{const r=await api('/hh',{method:'POST'});HH.id=r.id;try{localStorage.setItem('rc-hh',r.id)}catch(e){}await load();location.hash='stores';route()}catch(e){flash('Could not start: '+e.message)}}
+  else if(a==='unpick'){S.pick=null;render(true)}
+  else if(a==='ideas'){await getIdeas()}
+  else if(a==='wk2list'){const l=clone(S.list);l.recipes=l.recipes||{};for(const e of weekEntries())l.recipes[e.id]=(+l.recipes[e.id]||0)+(+e.serv||+S.recipes[e.id].servings);await save('list',0,l);location.hash='list'}
+  else if(a==='est'){let ings;if(S.view==='list'){ings=[];for(const id of Object.keys(S.list.recipes||{}))if(S.recipes[id])ings.push(...S.recipes[id].ingredients)}else ings=r.ingredients;
+    await fillPrices(ings)}
+  else if(a==='refresh'){const ks=new Set();for(const i of r.ingredients)if(!i.skip)ks.add(key(i.name));await refreshLive([...ks])}
+  else if(a==='tolist'){const l=clone(S.list);l.recipes=l.recipes||{};if(l.recipes[S.cur])delete l.recipes[S.cur];else l.recipes[S.cur]=S.serv||+r.servings;await save('list',0,l);render(true)}
+  else if(a==='clear'){if(t.dataset.sure){await save('list',0,{recipes:{},checked:{}});render(true)}else{t.dataset.sure=1;t.textContent='Tap again to clear'}}
+  else if(a==='del'){if(t.dataset.sure){const l=clone(S.list);if(l.recipes&&l.recipes[S.cur]){delete l.recipes[S.cur];await save('list',0,l)}await drop('recipes',S.cur);S.cur=null;location.hash='recipes'}else{t.dataset.sure=1;t.textContent='Tap again to delete'}}
+  else if(a==='padd'){S.pedit='__new';render(true)}
+  else if(a==='pcancel'){S.pedit=null;render(true)}
+  else if(a==='pdel'){if(t.dataset.sure){await drop('prices',S.pedit);S.pedit=null;render(true)}else{t.dataset.sure=1;t.textContent='Tap again to delete'}}
+  else if(a==='copy'){try{await navigator.clipboard.writeText('Import this recipe into my Recipe Costs app: '+S.draft.src);flash('Copied. Paste it to Claude in chat.')}catch(err){flash('Copy failed. Send Claude the link yourself.')}}
+});
+app.addEventListener('submit',async e=>{
+  e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f));
+  if(f.dataset.form==='ing'){
+    const r=clone(S.recipes[S.cur]),i=r.ingredients[S.edit];
+    i.name=(d.name||i.name).toLowerCase().trim();i.amount=+d.amount||0;i.base=d.base;i.skip=!!d.skip;
+    S.edit=null;await save('recipes',S.cur,r);
+    const k=key(i.name),np=readPrices(d,i.name,S.prices[k]);
+    if(CH.some(c=>np[c.id])&&JSON.stringify(np)!==JSON.stringify(S.prices[k]))await save('prices',k,np);
+    render(true);
+  }else if(f.dataset.form==='price'){
+    const name=d.name.toLowerCase().trim(),k=key(name),old=S.prices[S.pedit];
+    if(S.pedit!=='__new'&&S.pedit!==k)await drop('prices',S.pedit);
+    await save('prices',k,readPrices(d,name,old));S.pedit=null;render(true);
+  }else if(f.dataset.form==='meta'){
+    const r=clone(S.recipes[S.cur]);r.title=d.title.trim()||r.title;r.servings=Math.max(1,+d.servings||r.servings);r.tags=d.tags.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean).slice(0,6);r.source=d.source.trim();r.method=d.method.split('\n').map(x=>x.trim()).filter(Boolean);
+    S.meta=false;S.serv=null;await save('recipes',S.cur,r);render(true);
+  }else if(f.dataset.form==='plan'){
+    const i=+f.dataset.day,id=d.id,r=S.recipes[id];if(!r)return;
+    await editWeek(x=>{(x['d'+i]=x['d'+i]||[]).push({id,serv:Math.max(1,+d.serv||+r.servings)})});S.pick=null;render(true);
+  }else if(f.dataset.form==='stores'){
+    const st={use:{},names:{},ids:{}};for(const c of CH){st.use[c.id]=!!d['u_'+c.id];const sid=d['id_'+c.id]||'';st.ids[c.id]=sid;const so=(S.storeList[c.id]||[]).find(x=>x.id===sid);st.names[c.id]=so?so.name:''}
+    if(!CH.some(c=>st.use[c.id])){flash('Tick at least one supermarket.');return}
+    await save('st',0,st);flash('Stores saved.');render(true);
+  }else if(f.dataset.form==='add'){
+    const text=(d.text||'').trim();if(!text){flash('Paste the recipe text first.');return}
+    let r;S.busy='parse';render(true);
+    try{r=S.sample?await claudeParse(text,d.src):localParse(text,d.src)}catch(err){r=localParse(text,d.src);flash('Read it the simple way. Check the amounts.')}
+    S.busy='';
+    if(!r.ingredients.length){render(true);flash('No ingredients found. Each one should start with an amount.');return}
+    r.created=Date.now();const id='r'+Date.now().toString(36);
+    await save('recipes',id,r);S.draft={src:'',text:''};S.cur=id;S.serv=null;location.hash='recipe';
+    fillPrices(r.ingredients);
+  }else if(f.dataset.form==='import'){
+    const u=(d.src||'').trim();if(!u){flash('Paste a recipe link first.');return}
+    S.busy='import';render(true);let x;
+    try{x=await api('/import',{method:'POST',body:JSON.stringify({url:u})})}catch(err){S.busy='';render(true);flash(err.message);return}
+    S.busy='';
+    const r={title:x.title,servings:x.servings,source:x.source,image:x.image||'',method:x.method||[],tags:[],notes:'',created:Date.now(),ingredients:x.ingredients.map(parseLine)};
+    if(!r.ingredients.length){render(true);flash('No ingredients found on that page.');return}
+    const id='r'+Date.now().toString(36);await save('recipes',id,r);S.draft={src:'',text:''};S.cur=id;S.serv=null;location.hash='recipe';fillPrices(r.ingredients);
+  }
+});
+
+async function runFind(){const f=S.find;if(!f)return;try{f.res=await api(`/search?chain=${f.c}&store=${storeOf(f.c)}&q=${encodeURIComponent(f.q||f.name)}`);f.err=''}catch(e){f.err=e.message}f.loading=false;if(S.find===f)render(true)}
+async function load(){const d=await api(`/hh/${HH.id}/all`);S.recipes=d.recipes||{};S.prices=d.prices||{};const g=d.settings||{},st=g.stores,l=g.list,pl=g.plan;
+  if(st)S.st={use:{pns:true,ww:false,nw:true,...(st.use||{})},names:st.names||{},ids:st.ids||{}};if(l)S.list={recipes:l.recipes||{},checked:l.checked||{}};if(pl)S.plan={weeks:pl.weeks||{}};S.loading=false;S.note='';render()}
+async function init(){
+  const q=new URLSearchParams(location.search).get('h');let id=q;
+  if(!id){try{id=localStorage.getItem('rc-hh')}catch(e){}}
+  if(id){HH.id=id;try{localStorage.setItem('rc-hh',id)}catch(e){}if(q)history.replaceState(null,'',location.pathname+location.hash)}
+  route();
+  if(!HH.id){S.loading=false;render(true);return}
+  try{await load()}catch(e){S.loading=false;S.note=/not found/i.test(e.message)?'That household link isn’t valid. Ask for a new link.':'Can’t reach the server right now.';render()}
+  loadStores();
+  setInterval(()=>{if(document.visibilityState==='visible'&&!S.busy&&!S.find)load().catch(()=>{})},60000);
+}
+init();
+}
+</script>
+</body>
+</html>

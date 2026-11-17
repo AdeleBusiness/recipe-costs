@@ -1,0 +1,9 @@
+{
+  "name": "recipe-costs",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-01",
+  "rules": [{ "type": "Text", "globs": ["**/*.html"] }],
+  "d1_databases": [{ "binding": "DB", "database_name": "recipe-costs", "database_id": "b8724cf7-3b73-4a3c-a6d3-10beb7d9800f" }],
+  "kv_namespaces": [{ "binding": "KV", "id": "e5117443de8c4e338d9d7a901d8d8b76" }],
+  "triggers": { "crons": ["17 * * * *"] }
+}
