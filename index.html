@@ -98,6 +98,7 @@ li.card{cursor:default}li.card .s{grid-column:1/-1}
 .res{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer;width:100%;text-align:left;background:none;border-left:0;border-right:0;border-top:0;border-radius:0;font:inherit;color:inherit;min-height:56px}
 .res img{width:48px;height:48px;object-fit:contain;background:#fff;border-radius:8px;grid-row:span 2}.res b{font-weight:500}.res .pp{font:500 15px "DM Mono",monospace;text-align:right;white-space:nowrap}.res small{color:var(--mute)}
 .find{margin-top:12px;border-top:1px dashed var(--line);padding-top:6px}
+.star{color:var(--tom)}.favb{min-height:40px;padding:6px 14px;border-radius:20px}.favb[aria-pressed=true]{color:var(--tom);border-color:var(--tom)}
 .empty{text-align:center;padding:36px 10px;color:var(--mute)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;max-width:90vw;font-weight:500;z-index:9}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:r .8s linear infinite;vertical-align:-3px;margin-right:8px}
@@ -256,7 +257,7 @@ function avgMatch(name){
 }
 function avgLine(it){const m=avgMatch(it.name);if(!m)return null;let amt=it.amt,approx=false;
   if(m.base!==it.base){if(m.base!=='ea'&&it.base!=='ea')approx=true;else if(it.base==='ea'&&m.base==='g'&&eaG(it.name)){amt=it.amt*eaG(it.name);approx=true}else return null}
-  return {c:amt/m.size*m.price,m,approx};}
+  return {c:amt/m.size*m.price,m,approx,amt};}
 const avgPeriod=()=>{if(!S.avg||!S.avg.period)return '';const [y,mo]=S.avg.period.split('.');return new Date(+y,+mo-1,1).toLocaleDateString('en-NZ',{month:'short',year:'numeric'})};
 
 /* ---------- costing ---------- */
@@ -268,33 +269,40 @@ function lineAt(it,cid){const p=S.prices[it.key],q=p&&p[cid];
     if(b!=='ea'&&it.base!=='ea')approx=true;
     else if(it.base==='ea'&&b==='g'&&eaG(it.name)){amt=it.amt*eaG(it.name);approx=true}
     else return null}
-  return {c:amt/ +q.size* +q.price,q,approx,b};}
-function costItems(items){
+  return {c:amt/ +q.size* +q.price,q,approx,b,amt};}
+const byWeight=m=>/, 1kg$/i.test(m.title)&&!/frozen|supermarket only|flour|sugar|rice|biscuit|nugget|fries|cereal|muesli/i.test(m.title);
+const packsOf=(amt,size)=>Math.max(1,Math.ceil(amt/size-1e-6));
+function costItems(items,packs){
   const ch=chains(),tot={},miss={},groups={},un=[];let split=0;
   for(const c of ch){tot[c.id]=0;miss[c.id]=0;groups[c.id]=[]}
   for(const it of items){let best=null;
-    for(const c of ch){const l=lineAt(it,c.id);if(!l){miss[c.id]++;continue}tot[c.id]+=l.c;if(!best||l.c<best.l.c)best={c:c.id,l}}
+    for(const c of ch){const l=lineAt(it,c.id);if(!l){miss[c.id]++;continue}if(packs){l.packs=packsOf(l.amt,+l.q.size);l.c=l.packs* +l.q.price}tot[c.id]+=l.c;if(!best||l.c<best.l.c)best={c:c.id,l}}
     if(best){split+=best.l.c;groups[best.c].push({it,l:best.l})}else un.push(it)}
-  let avg=0,avgN=0;for(const it of items){const a=avgLine(it);if(a){avg+=a.c;avgN++;it.avg=a}}
-  return {ch,tot,miss,groups,un,split,avg,avgN,n:items.length};
+  let avg=0,avgN=0;for(const it of items){const a=avgLine(it);if(a){if(packs&&!byWeight(a.m)){a.packs=packsOf(a.amt,a.m.size);a.c=a.packs*a.m.price}avg+=a.c;avgN++;it.avg=a}}
+  const best=split+un.reduce((t,i)=>t+(i.avg?i.avg.c:0),0),none=un.filter(i=>!i.avg).length;
+  return {ch,tot,miss,groups,un,split,avg,avgN,n:items.length,best,none};
 }
-const itemsOf=(r,serv)=>{const m=serv/(+r.servings||1);return r.ingredients.map((i,ix)=>({ix,key:key(i.name),name:i.name,base:i.base,amt:(+i.amount||0)*m,label:i.line,skip:i.skip}))};
+const priceKey=n=>{const k=key(n);if(S.prices[k])return k;const ak=aggKey(n);const hit=Object.entries(S.prices).find(([,p])=>p&&p.name&&aggKey(p.name)===ak);return hit?hit[0]:k};
+const itemsOf=(r,serv)=>{const m=serv/(+r.servings||1);return r.ingredients.map((i,ix)=>({ix,key:priceKey(i.name),name:i.name,base:i.base,amt:(+i.amount||0)*m,label:i.line,skip:i.skip}))};
 
 /* ---------- views ---------- */
 function vRecipes(){
   const all=Object.entries(S.recipes),tags=[...new Set(all.flatMap(([,r])=>r.tags||[]))].sort();
   const q=S.q.toLowerCase();
-  const rs=all.filter(([,r])=>(!S.tag||(r.tags||[]).includes(S.tag))&&(!q||r.title.toLowerCase().includes(q)||r.ingredients.some(i=>i.name.includes(q)))).sort((a,b)=>(b[1].created||0)-(a[1].created||0));
+  const U={};for(const [id] of all)U[id]=usage(id);
+  const rs=all.filter(([id,r])=>(S.tag!=='★'||r.fav)&&(!S.tag||S.tag==='★'||(r.tags||[]).includes(S.tag))&&(!q||r.title.toLowerCase().includes(q)||r.ingredients.some(i=>i.name.includes(q))))
+    .sort((a,b)=>(!!b[1].fav-!!a[1].fav)||(S.sort==='used'?U[b[0]].n-U[a[0]].n:S.sort==='az'?a[1].title.localeCompare(b[1].title):0)||(b[1].created||0)-(a[1].created||0));
   let h=`<div class="row" style="justify-content:space-between"><h2 class="v">Recipes</h2><a class="btn go" href="#add">Add recipe</a></div>`;
   if(S.note)h+=`<p class="warn">${esc(S.note)}</p>`;
   if(S.loading&&!all.length)return h+`<p class="empty"><span class="spin"></span>Loading your recipes…</p>`;
   if(!all.length)return h+`<div class="empty"><h3>No recipes yet</h3><p>Paste one in and it gets costed at each of your supermarkets.</p></div>`;
   h+=`<input id="q" type="search" placeholder="Search recipes or ingredients" value="${esc(S.q)}" style="margin-top:12px">`;
-  if(tags.length)h+=`<div class="chips">${['',...tags].map(t=>`<button class="chip" data-tag="${esc(t)}" aria-pressed="${S.tag===t}">${t?esc(t):'All'}</button>`).join('')}</div>`;
+  h+=`<div class="chips">${['','★',...tags].map(t=>`<button class="chip" data-tag="${esc(t)}" aria-pressed="${S.tag===t}">${t==='★'?'★ Favourites':t?esc(t):'All'}</button>`).join('')}</div>
+  <div class="row" style="gap:6px;margin-bottom:4px"><span class="hint">Sort:</span>${[['new','Newest'],['used','Most planned'],['az','A–Z']].map(([k,l])=>`<button class="chip" data-sort="${k}" aria-pressed="${(S.sort||'new')===k}">${l}</button>`).join('')}</div>`;
   return h+`<ul class="list" style="margin-top:12px">${rs.map(([id,r])=>{const c=costItems(itemsOf(r,+r.servings||1).filter(i=>!i.skip));
     const best=c.ch.filter(x=>!c.miss[x.id]).sort((a,b)=>c.tot[a.id]-c.tot[b.id])[0];
-    return `<li><button class="card${r.image?' has-img':''}" data-open="${esc(id)}">${r.image?`<img class="thumb" src="${esc(r.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}<h3>${esc(r.title)}</h3><span class="p">${c.split?money(c.split):c.avg?money(c.avg):'—'}</span>
-    <span class="s">Serves ${esc(r.servings)} · ${money((c.split||c.avg)/(+r.servings||1))} a serve${!c.split&&c.avg?' (NZ average)':''}${best?` · cheapest at <b>${esc(best.n)}</b>`:''}${c.split&&c.un.length?` · ${c.un.length} unpriced`:!c.split&&c.n>c.avgN?` · ${c.n-c.avgN} not costed`:''}</span>
+    return `<li><button class="card${r.image?' has-img':''}" data-open="${esc(id)}">${r.image?`<img class="thumb" src="${esc(r.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}<h3>${r.fav?'<span class="star" aria-label="Favourite">★</span> ':''}${esc(r.title)}</h3><span class="p">${c.best?money(c.best):'—'}</span>
+    <span class="s">Serves ${esc(r.servings)} · ${money(c.best/(+r.servings||1))} a serve${U[id].n?` · planned ${U[id].n}×`:''}${best&&!c.un.length?` · cheapest at <b>${esc(best.n)}</b>`:''}${c.none?` · ${c.none} not costed`:''}</span>
     ${(r.tags||[]).length?`<span style="grid-column:${r.image?'2':'1'}/-1">${r.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</span>`:''}</button></li>`}).join('')||'<p class="empty">No match.</p>'}</ul>`;
 }
 function vItemEd(i){
@@ -319,7 +327,7 @@ function readPrices(d,name,old){
   return p;
 }
 function vGroups(c,attr,lead,after,done){
-  const row=(x,miss)=>{const it=x.it||x;return `<li class="it${done&&done(it)?' done':''}">${lead?lead(it):''}<button ${attr(it)}><span class="nm">${esc(it.label)}</span><span class="c${miss&&!it.avg?' miss':''}">${miss?(it.avg?money(it.avg.c):'Add price'):money(x.l.c)}</span><small>${miss?(it.avg?`NZ average · ${esc(it.avg.m.title)}`:'no price yet'):`${fq(it.amt,it.base)}${x.l.approx?' (≈)':''} of ${fq(+x.l.q.size,x.l.b)} @ ${money(+x.l.q.price)}${x.l.q.live?'<span class="live">live</span>':''}${x.l.q.est?'<span class="est">est.</span>':''}${x.l.q.sp||x.l.q.deal?`<span class="sp">${esc(x.l.q.deal||'special')}</span>`:''}`}${!miss&&x.l.q.pname?`<br>${esc(x.l.q.pname)}`:''}</small></button>${after?after(it):''}</li>`};
+  const row=(x,miss)=>{const it=x.it||x;return `<li class="it${done&&done(it)?' done':''}">${lead?lead(it):''}<button ${attr(it)}><span class="nm">${esc(it.label)}</span><span class="c${miss&&!it.avg?' miss':''}">${miss?(it.avg?money(it.avg.c):'Add price'):money(x.l.c)}</span><small>${miss?(it.avg?`${it.avg.packs?`buy ${it.avg.packs} × ${fq(it.avg.m.size,it.avg.m.base)} · `:''}NZ average · ${esc(it.avg.m.title)}`:'no price yet'):`${x.l.packs?`buy ${x.l.packs} × ${fq(+x.l.q.size,x.l.b)} @ ${money(+x.l.q.price)}`:`${fq(it.amt,it.base)}${x.l.approx?' (≈)':''} of ${fq(+x.l.q.size,x.l.b)} @ ${money(+x.l.q.price)}`}${x.l.q.live?'<span class="live">live</span>':''}${x.l.q.est?'<span class="est">est.</span>':''}${x.l.q.sp||x.l.q.deal?`<span class="sp">${esc(x.l.q.deal||'special')}</span>`:''}`}${!miss&&x.l.q.pname?`<br>${esc(x.l.q.pname)}`:''}</small></button>${after?after(it):''}</li>`};
   let h=c.ch.filter(ch=>c.groups[ch.id].length).map(ch=>{const g=c.groups[ch.id],sub=g.reduce((a,x)=>a+x.l.c,0);
     return `<div class="grp"><h4>${dot(ch.id)}${esc(sname(ch))}<span class="t">${money(sub)}</span></h4><ul class="list" style="gap:0">${g.map(x=>row(x)).join('')}</ul></div>`}).join('');
   if(c.un.length)h+=`<div class="grp"><h4>${c.un.some(i=>i.avg)?'Not priced at your stores yet':'No price yet'}</h4><ul class="list" style="gap:0">${c.un.map(it=>row(it,1)).join('')}</ul>
@@ -328,8 +336,9 @@ function vGroups(c,attr,lead,after,done){
 }
 function vStoreRows(c,per){
   const done=c.ch.filter(x=>!c.miss[x.id]),lo=done.length?Math.min(...done.map(x=>c.tot[x.id])):null;
+  const bestRow=c.split&&c.un.some(i=>i.avg)?`<div class="st best"><span class="nm">Best estimate</span><span class="m">${money(c.best)}</span><small>your store prices, with NZ averages for the rest${per?' · '+money(c.best/per)+' a serve':''}</small></div>`:'';
   const avgRow=c.avgN?`<div class="st"><span class="nm"><span class="dot" style="background:var(--mute)"></span>NZ average</span><span class="m" style="color:var(--mute)">${money(c.avg)}${c.avgN<c.n?`<i style="color:var(--mute)">${c.avgN} of ${c.n} items</i>`:''}</span><small>Stats NZ average prices, ${esc(avgPeriod())}${per?' · '+money(c.avg/per)+' a serve':''}</small></div>`:'';
-  return `<div class="stores">${avgRow}${c.ch.map(ch=>`<div class="st${!c.miss[ch.id]&&c.tot[ch.id]===lo&&done.length>1?' best':''}"><span class="nm">${dot(ch.id)}${esc(sname(ch))}</span><span class="m">${c.tot[ch.id]||!c.miss[ch.id]?money(c.tot[ch.id]):'—'}${c.miss[ch.id]?`<i>+${c.miss[ch.id]} unpriced</i>`:''}</span>${per&&c.tot[ch.id]?`<small>${money(c.tot[ch.id]/per)} a serve</small>`:'<small>enter prices you pay to compare</small>'}</div>`).join('')}</div>
+  return `<div class="stores">${bestRow}${avgRow}${c.ch.map(ch=>`<div class="st${!c.miss[ch.id]&&c.tot[ch.id]===lo&&done.length>1?' best':''}"><span class="nm">${dot(ch.id)}${esc(sname(ch))}</span><span class="m">${c.tot[ch.id]||!c.miss[ch.id]?money(c.tot[ch.id]):'—'}${c.miss[ch.id]?`<i>+${c.miss[ch.id]} unpriced</i>`:''}</span>${per&&c.tot[ch.id]?`<small>${money(c.tot[ch.id]/per)} a serve</small>`:'<small>enter prices you pay to compare</small>'}</div>`).join('')}</div>
   ${c.split>0?`<div class="split"><span>Split shop</span><span class="big">${money(c.split)}</span><small>Each item where it’s cheapest${done.length&&Math.min(...done.map(x=>c.tot[x.id]))-c.split>0.005?`, saves ${money(Math.min(...done.map(x=>c.tot[x.id]))-c.split)} on the cheapest single store`:''}</small>${per?`<small style="text-align:right">${money(c.split/per)} a serve</small>`:''}</div>`:''}`;
 }
 function vDetail(){
@@ -340,10 +349,12 @@ function vDetail(){
   const edit=it=>`data-edit="${it.ix}" aria-expanded="${S.edit===it.ix}"`;
   const groups=vGroups(c,edit,null,it=>S.edit===it.ix?vItemEd(r.ingredients[it.ix]):'');
   return `<p><button class="link" data-act="back">← All recipes</button></p>
+  <div class="row" style="justify-content:flex-end;margin-bottom:-6px"><button class="favb" data-act="fav" aria-pressed="${!!r.fav}">${r.fav?'★ Favourite':'☆ Add to favourites'}</button></div>
   <article class="docket">${r.image?`<img class="hero" src="${esc(r.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`:''}<h2>${esc(r.title)}</h2>
   ${host?`<div class="src">From <a href="${esc(r.source)}" target="_blank" rel="noopener">${esc(host)}</a>${r.image?' · photo from '+esc(host):''}</div>`:''}
   ${(r.tags||[]).length?`<div style="margin-top:8px">${r.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
   <div class="serv">Serves <button data-act="minus" aria-label="Fewer servings">−</button><b>${serv}</b><button data-act="plus" aria-label="More servings">+</button>${serv!==+r.servings?`<button class="link" data-act="reset">reset to ${esc(r.servings)}</button>`:''}</div>
+  ${(u=>u.n?`<p class="hint" style="margin:10px 0 0">Planned ${u.n} time${u.n>1?'s':''}${u.last?`, most recently ${u.last.toLocaleDateString('en-NZ',{weekday:'short',day:'numeric',month:'short'})}`:''}</p>`:`<p class="hint" style="margin:10px 0 0">Not planned yet</p>`)(usage(S.cur))}
   ${vStoreRows(c,serv)}</article>
   <div class="row" style="margin:16px 0"><button class="${inList?'':'go'}" data-act="tolist">${inList?'On shopping list ✓':'Add to shopping list'}</button><button data-act="toplan">Add to meal plan</button><button data-act="meta">Edit details</button></div>
   <div class="row" style="margin:-4px 0 12px">${!LIVE?'':S.busy==='prices'?'<span><span class="spin"></span>Finding live prices…</span>':S.busy==='refresh'?'<span><span class="spin"></span>Refreshing…</span>':`<button data-act="est">Find live prices</button><button data-act="refresh">Refresh prices</button>`}${updatedLine(r)}</div>
@@ -378,26 +389,36 @@ function vAdd(){
 function vList(){
   const L=S.list.recipes||{},ids=Object.keys(L).filter(id=>S.recipes[id]);
   if(!ids.length)return `<h2 class="v">Shopping list</h2><p class="empty">Open a recipe and tap “Add to shopping list”. Everything gets combined here and split by the cheapest store.</p>`;
-  const c=costItems(aggregate(ids.map(id=>({id,serv:+L[id]||+S.recipes[id].servings}))));
+  const c=costItems(aggregate(ids.map(id=>({id,serv:+L[id]||+S.recipes[id].servings}))),true);
   const got=it=>!!(S.list.checked&&S.list.checked[it.key]);
   const g=vGroups(c,it=>`data-pk="${esc(it.key)}"`,it=>`<input type="checkbox" class="ck" data-ck="${esc(it.key)}" aria-label="Got ${esc(it.name)}"${got(it)?' checked':''}>`,it=>S.pedit===it.key?vPriceEd(it.key):'',got);
   return `<div class="row" style="justify-content:space-between"><h2 class="v">Shopping list</h2><button data-act="clear">Clear list</button></div>
   <ul class="list" style="gap:6px;margin:10px 0">${ids.map(id=>`<li class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0"><button class="link" data-open="${esc(id)}">${esc(S.recipes[id].title)}</button><span class="serv" style="margin:0"><button data-ls="${esc(id)}" data-d="-1" aria-label="Fewer servings">−</button><b>${+L[id]}</b><button data-ls="${esc(id)}" data-d="1" aria-label="More servings">+</button></span></li>`).join('')}</ul>
   <article class="docket">${vStoreRows(c,0)}</article>
-  <h3 class="s">Where to buy</h3><p class="hint" style="margin:0">Tick items off as you shop. Tap an item to update its prices.</p>${g}`;
+  <h3 class="s">Where to buy</h3><p class="hint" style="margin:0">The same ingredient from different recipes is added together, and costs are for the whole packs you’ll buy. Tick items off as you shop.</p>${g}`;
 }
+const AGGSTOP=new Set([...STOP,'clove','sprig','bunch','jar','packet','bag','pack','piece','head','bulb','stalk','stick','handful','fillet']);
+const aggKey=n=>toks(n).filter(w=>!AGGSTOP.has(w)).sort().join(' ')||key(n);
+function conv(amt,from,to,name){if(from===to)return amt;if(from!=='ea'&&to!=='ea')return amt;const g=eaG(name);if(!g)return null;if(from==='ea'&&to==='g')return amt*g;if(from==='g'&&to==='ea')return amt/g;return null}
+const hasPrice=k=>{const p=S.prices[k];return !!(p&&CH.some(c=>p[c.id]&&+p[c.id].price>0))};
 function aggregate(entries){
   const agg={};
   for(const e of entries){const r=S.recipes[e.id];if(!r)continue;
-    for(const it of itemsOf(r,+e.serv||+r.servings)){if(it.skip)continue;const k=it.key+'|'+it.base;if(agg[k])agg[k].amt+=it.amt;else agg[k]={...it}}}
-  return Object.values(agg).map(a=>({...a,label:a.name.charAt(0).toUpperCase()+a.name.slice(1)+' · '+fq(a.amt,a.base)}));
+    for(const it of itemsOf(r,+e.serv||+r.servings)){if(it.skip)continue;const ak=aggKey(it.name);
+      let a=agg[ak];
+      if(a){const v=conv(it.amt,it.base,a.base,it.name);
+        if(v==null){const k2=ak+'|'+it.base;if(agg[k2]){agg[k2].amt+=it.amt;agg[k2].from.add(r.title)}else agg[k2]={...it,from:new Set([r.title])};continue}
+        a.amt+=v;a.from.add(r.title);if(!hasPrice(a.key)&&hasPrice(it.key)){a.key=it.key;a.name=it.name}}
+      else agg[ak]={...it,from:new Set([r.title])}}}
+  return Object.values(agg).map(a=>({...a,label:a.name.charAt(0).toUpperCase()+a.name.slice(1)+' · '+fq(a.amt,a.base)+(a.from.size>1?` (${a.from.size} recipes)`:'')}));
 }
+function usage(id){let n=0,last=null;const W=S.plan.weeks||{};for(const wk of Object.keys(W))for(let i=0;i<7;i++)for(const e of (W[wk]['d'+i]||[]))if(e.id===id){n++;const [y,m,d]=wk.split('-').map(Number);const dt=new Date(y,m-1,d+i);if(!last||dt>last)last=dt}return {n,last}}
 const weekObj=()=>(S.plan.weeks&&S.plan.weeks[iso(S.wk)])||{};
 const weekEntries=()=>{const w=weekObj(),out=[];for(let i=0;i<7;i++)for(const e of (w['d'+i]||[]))if(S.recipes[e.id])out.push(e);return out};
 async function editWeek(fn){const p=clone(S.plan);p.weeks=p.weeks||{};const k=iso(S.wk);p.weeks[k]=p.weeks[k]||{};fn(p.weeks[k]);
-  const keep=Object.keys(p.weeks).sort().slice(-12),w={};for(const x of keep)w[x]=p.weeks[x];p.weeks=w;await save('plan',0,p)}
+  const keep=Object.keys(p.weeks).sort().slice(-156),w={};for(const x of keep)w[x]=p.weeks[x];p.weeks=w;await save('plan',0,p)}
 function vPlan(){
-  const wk=weekObj(),entries=weekEntries(),c=costItems(aggregate(entries)),today=iso(new Date());
+  const wk=weekObj(),entries=weekEntries(),c=costItems(aggregate(entries),true),today=iso(new Date());
   const ro=Object.entries(S.recipes).sort((a,b)=>a[1].title.localeCompare(b[1].title)).map(([id,r])=>`<option value="${esc(id)}">${esc(r.title)}</option>`).join('');
   const days=[...Array(7)].map((_,i)=>{const d=addDays(S.wk,i),es=(wk['d'+i]||[]);
     return `<div class="day${iso(d)===today?' today':''}"><h4>${dayLbl(d)}</h4>
@@ -500,7 +521,7 @@ app.addEventListener('keydown',e=>{const p=e.target.closest('[data-p]');if(p&&(e
 app.addEventListener('click',async e=>{
   const ck=e.target.closest('[data-ck]');
   if(ck){e.stopPropagation();const l=clone(S.list);l.checked=l.checked||{};if(ck.checked)l.checked[ck.dataset.ck]=true;else delete l.checked[ck.dataset.ck];await save('list',0,l);render(true);return}
-  const t=e.target.closest('[data-open],[data-edit],[data-act],[data-p],[data-pk],[data-tag],[data-ls],[data-pick],[data-unplan],[data-wk],[data-quick],[data-idea],[data-planday],[data-find],[data-pickres]');if(!t)return;
+  const t=e.target.closest('[data-open],[data-edit],[data-act],[data-p],[data-pk],[data-tag],[data-ls],[data-pick],[data-unplan],[data-wk],[data-quick],[data-idea],[data-planday],[data-find],[data-pickres],[data-sort]');if(!t)return;
   if(t.dataset.find){S.find={k:t.dataset.k,name:t.dataset.n,base:t.dataset.b,c:t.dataset.find,q:t.dataset.n,res:null,loading:true};render(true);await runFind();return}
   if(t.dataset.pickres!=null){const f=S.find,r=f&&f.res&&f.res[+t.dataset.pickres];if(!r)return;await linkProduct(f.k,f.name,f.base,f.c,r);S.find=null;flash('Linked to '+r.name);render(true);return}
   if(t.dataset.pick!=null){S.pick=+t.dataset.pick;render(true);return}
@@ -513,6 +534,7 @@ app.addEventListener('click',async e=>{
     const id='r'+Date.now().toString(36);d.saved=true;await save('recipes',id,r);flash('Saved to your recipes.');render(true);fillPrices(r.ingredients);return}
   if(t.dataset.open){S.cur=t.dataset.open;S.serv=null;S.edit=null;S.meta=false;if(location.hash==='#recipe')route();else location.hash='recipe';return}
   if(t.dataset.tag!=null){S.tag=t.dataset.tag;render(true);return}
+  if(t.dataset.sort){S.sort=t.dataset.sort;render(true);return}
   if(t.dataset.edit!=null){const ix=+t.dataset.edit;S.edit=S.edit===ix?null:ix;render(true);return}
   if(t.dataset.p){S.pedit=t.dataset.p;render(true);return}
   if(t.dataset.pk){S.pedit=S.pedit===t.dataset.pk?null:t.dataset.pk;render(true);return}
@@ -525,6 +547,7 @@ app.addEventListener('click',async e=>{
   else if(a==='cancel'){S.edit=null;render(true)}
   else if(a==='meta'){S.meta=!S.meta;render(true)}
   else if(a==='toplan'){S.planPick=!S.planPick;render(true)}
+  else if(a==='fav'){const o=clone(r);o.fav=!o.fav;await save('recipes',S.cur,o);flash(o.fav?'Added to favourites':'Removed from favourites');render(true)}
   else if(a==='findgo'){if(S.find){S.find.loading=true;render(true);await runFind()}}
   else if(a==='geo'){if(!navigator.geolocation){flash('Location isn’t available on this device.');return}navigator.geolocation.getCurrentPosition(p=>{S.geo={lat:p.coords.latitude,lng:p.coords.longitude};render(true)},()=>flash('Couldn’t get your location. Pick your store from the list.'),{timeout:10000})}
   else if(a==='copyhh'){try{await navigator.clipboard.writeText(location.origin+'/?h='+HH.id);flash('Link copied.')}catch(e){flash('Copy failed. Press and hold the link to copy it.')}}
