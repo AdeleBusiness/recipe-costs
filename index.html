@@ -99,6 +99,8 @@ li.card{cursor:default}li.card .s{grid-column:1/-1}
 .res img{width:48px;height:48px;object-fit:contain;background:#fff;border-radius:8px;grid-row:span 2}.res b{font-weight:500}.res .pp{font:500 15px "DM Mono",monospace;text-align:right;white-space:nowrap}.res small{color:var(--mute)}
 .find{margin-top:12px;border-top:1px dashed var(--line);padding-top:6px}
 .star{color:var(--tom)}.favb{min-height:40px;padding:6px 14px;border-radius:20px}.favb[aria-pressed=true]{color:var(--tom);border-color:var(--tom)}
+.scan{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20;display:grid;place-items:center;padding:16px}.scan[hidden]{display:none}
+.scanbox{width:min(440px,100%);background:#111;color:#fff;border-radius:16px;padding:16px}.scanbox video{width:100%;border-radius:10px;background:#000;aspect-ratio:4/3;object-fit:cover}
 .empty{text-align:center;padding:36px 10px;color:var(--mute)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;max-width:90vw;font-weight:500;z-index:9}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:r .8s linear infinite;vertical-align:-3px;margin-right:8px}
@@ -115,6 +117,9 @@ li.card{cursor:default}li.card .s{grid-column:1/-1}
 </header>
 <main id="app"></main>
 <div id="toast" class="toast" hidden></div>
+<div id="scan" class="scan" hidden><div class="scanbox"><p style="margin:0 0 8px;font-weight:600">Point the camera at a barcode</p><video id="scanv" playsinline muted></video><p id="scanmsg" class="hint" style="color:#ddd">Starting camera…</p>
+<form id="scanman" class="row"><input id="scancode" inputmode="numeric" placeholder="Or type the barcode number" aria-label="Barcode number" style="flex:1 1 160px"><button>Look up</button></form>
+<button id="scanclose" style="margin-top:10px;width:100%">Close</button></div></div>
 <script>
 {
 const $=s=>document.querySelector(s);
@@ -125,7 +130,7 @@ const key=n=>String(n||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').repla
 const clone=o=>JSON.parse(JSON.stringify(o));
 const CH=[{id:'pns',n:'Pak’nSave'},{id:'ww',n:'Woolworths'},{id:'nw',n:'New World'}];
 const dot=c=>`<span class="dot" style="background:var(--${c})"></span>`;
-const S={recipes:{},prices:{},st:{use:{pns:true,ww:false,nw:true},names:{},ids:{}},storeList:{},geo:null,find:null,sq:'',avg:null,list:{recipes:{},checked:{}},view:'recipes',cur:null,serv:null,edit:null,pedit:null,meta:false,q:'',tag:'',pq:'',db:null,sample:null,loading:true,busy:'',note:'',draft:{src:'',text:''},plan:{weeks:{}},wk:null,pick:null,ideas:[],planPick:false};
+const S={recipes:{},prices:{},st:{use:{pns:true,ww:false,nw:true},names:{},ids:{}},storeList:{},geo:null,find:null,sq:'',avg:null,pantry:{items:{}},padd:false,list:{recipes:{},checked:{}},view:'recipes',cur:null,serv:null,edit:null,pedit:null,meta:false,q:'',tag:'',pq:'',db:null,sample:null,loading:true,busy:'',note:'',draft:{src:'',text:''},plan:{weeks:{}},wk:null,pick:null,ideas:[],planPick:false};
 const HH={id:null};
 const LIVE=false; // live supermarket feeds switched off until a permitted data source exists
 async function api(path,opt={}){const r=await fetch('/api'+path,{...opt,headers:{'content-type':'application/json',...(opt.headers||{})}});let js=null;try{js=await r.json()}catch(e){}if(!r.ok)throw new Error(js&&js.error||('Error '+r.status));return js}
@@ -135,7 +140,7 @@ const sname=c=>S.st.names&&S.st.names[c.id]?S.st.names[c.id]:c.n;
 
 function flash(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(flash.t);flash.t=setTimeout(()=>t.hidden=true,3200)}
 
-const DOC={st:['settings','stores'],list:['settings','list'],plan:['settings','plan']};
+const DOC={st:['settings','stores'],list:['settings','list'],plan:['settings','plan'],pantry:['settings','pantry']};
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const monday=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-(x.getDay()+6)%7);return x};
@@ -386,19 +391,61 @@ function vAdd(){
   <form data-form="add"><label for="a-t">Recipe text</label><textarea id="a-t" name="text" placeholder="Title, serves, ingredients (one per line, starting with the amount) and method">${esc(d.text)}</textarea>
   <button class="go" style="margin-top:10px">Read recipe</button></form></details>`;
 }
+/* ---------- pantry ---------- */
+function pantryFind(name){const ak=aggKey(name);if(S.pantry.items[ak])return ak;const t=ak.split(' ');return Object.keys(S.pantry.items).find(k=>{const w=k.split(' ');return t.every(x=>w.includes(x))&&w.length<=t.length+1})||null}
+function pantryHave(name,base){const k=pantryFind(name);if(!k)return 0;const p=S.pantry.items[k];const v=conv(+p.amt||0,p.base,base,name);return v==null?0:Math.max(0,v)}
+async function pantryAdd(name,amt,base,src){const P=clone(S.pantry);P.items=P.items||{};const k=pantryFind(name)||aggKey(name);const cur=P.items[k];
+  if(cur){const v=conv(amt,base,cur.base,name);if(v!=null){cur.amt=Math.round((+cur.amt+v)*100)/100;cur.updated=Date.now();cur.src=src}else P.items[k]={name,amt,base,updated:Date.now(),src}}
+  else P.items[k]={name,amt:Math.round(amt*100)/100,base,updated:Date.now(),src};
+  await save('pantry',0,P)}
+function listItems(){const L=S.list.recipes||{},ids=Object.keys(L).filter(id=>S.recipes[id]);
+  const all=aggregate(ids.map(id=>({id,serv:+L[id]||+S.recipes[id].servings}))),need=[],home=[];
+  for(const it of all){const have=pantryHave(it.name,it.base);
+    if(have>=it.amt-1e-6){home.push({...it,have});continue}
+    if(have>0){it.need0=it.amt;it.amt=it.amt-have;it.have=have;it.label=it.name.charAt(0).toUpperCase()+it.name.slice(1)+' · '+fq(it.amt,it.base)+` (have ${fq(have,it.base)} at home)`+(it.from.size>1?` · ${it.from.size} recipes`:'')}
+    need.push(it)}
+  return {ids,need,home};
+}
+function vPantry(){
+  const P=Object.entries(S.pantry.items||{}).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  return `<h3 class="s">At home</h3><p class="hint" style="margin:0 0 8px">What’s already in your cupboard and fridge. The shopping list leaves these out. Leftovers from packs you buy are added here automatically when you finish shopping.</p>
+  <div class="row"><button data-act="padd">+ Add item</button><button data-act="scan">Scan barcode</button></div>
+  ${S.padd?`<form class="ed" data-form="pantry" style="margin-top:10px;padding-top:4px"><label for="pa-n">Item</label><input id="pa-n" name="name" placeholder="e.g. garlic, rice, frozen peas" required value="${esc(S.padd.name||'')}">
+    <div class="g3"><div><label for="pa-a">Amount</label><input id="pa-a" name="amt" type="number" step="any" inputmode="decimal" value="${esc(S.padd.amt||'')}" required></div><div><label for="pa-b">Unit</label><select id="pa-b" name="base">${opts(S.padd.base||'ea')}</select></div></div>
+    ${S.padd.scanned?`<p class="hint">Scanned: ${esc(S.padd.scanned)}. Shorten the name to the plain ingredient (e.g. “frozen peas”) so recipes can find it.</p>`:''}
+    <div class="row" style="margin-top:10px"><button class="go">Save</button><button type="button" data-act="pcancel2">Cancel</button></div></form>`:''}
+  ${P.length?`<ul class="list" style="gap:0;margin-top:8px">${P.map(([k,p])=>`<li class="pe" style="border-bottom:1px solid var(--line);padding:6px 0"><span style="flex:1 1 auto">${esc(p.name.charAt(0).toUpperCase()+p.name.slice(1))} <span class="hint">· ${fq(+p.amt,p.base)}${p.src==='leftover'?' · leftover':''}</span></span><button class="x" data-pminus="${esc(k)}" aria-label="Use some">−</button><button class="x" data-pdel="${esc(k)}" aria-label="Remove ${esc(p.name)}">×</button></li>`).join('')}</ul>`:'<p class="hint">Nothing recorded yet.</p>'}`;
+}
+async function finishShop(){
+  const {need,home}=listItems(),c=costItems(need,true),P=clone(S.pantry);P.items=P.items||{};
+  const put=(name,amt,base)=>{if(!(amt>0.0001))return;const k=Object.keys(P.items).find(x=>x===aggKey(name))||aggKey(name);const cur=P.items[k];
+    if(cur){const v=conv(amt,base,cur.base,name);if(v!=null){cur.amt=Math.round((+cur.amt+v)*100)/100;cur.src='leftover';cur.updated=Date.now();return}}P.items[k]={name,amt:Math.round(amt*100)/100,base,src:'leftover',updated:Date.now()}};
+  const use=(name,amt,base)=>{const k=pantryFind(name);if(!k)return;const p=P.items[k];const v=conv(amt,base,p.base,name);if(v==null)return;p.amt=Math.round(Math.max(0,+p.amt-v)*100)/100;if(p.amt<=0.0001)delete P.items[k]};
+  for(const it of home)use(it.name,it.amt,it.base);
+  for(const it of need)if(it.have)use(it.name,it.have,it.base);
+  let n=0;
+  for(const ch of c.ch)for(const x of c.groups[ch.id]){const b=x.l.b,bought=x.l.packs?conv(x.l.packs* +x.l.q.size,b,x.it.base,x.it.name):null;if(bought!=null&&bought-x.it.amt>0.0001){put(x.it.name,bought-x.it.amt,x.it.base);n++}}
+  for(const it of c.un)if(it.avg&&it.avg.packs){const bought=conv(it.avg.packs*it.avg.m.size,it.avg.m.base,it.base,it.name);if(bought!=null&&bought-it.amt>0.0001){put(it.name,bought-it.amt,it.base);n++}}
+  await save('pantry',0,P);await save('list',0,{recipes:{},checked:{}});
+  flash(n?`Done! ${n} leftover${n>1?'s':''} added to At home.`:'Done! List cleared.');render(true);
+}
 function vList(){
-  const L=S.list.recipes||{},ids=Object.keys(L).filter(id=>S.recipes[id]);
-  if(!ids.length)return `<h2 class="v">Shopping list</h2><p class="empty">Open a recipe and tap “Add to shopping list”. Everything gets combined here and split by the cheapest store.</p>`;
-  const c=costItems(aggregate(ids.map(id=>({id,serv:+L[id]||+S.recipes[id].servings}))),true);
+  const L=S.list.recipes||{},{ids,need,home}=listItems();
+  if(!ids.length)return `<h2 class="v">Shopping list</h2><p class="empty">Open a recipe and tap “Add to shopping list”, or add a week from the meal plan. Everything gets combined here.</p>${vPantry()}`;
+  const c=costItems(need,true);
   const got=it=>!!(S.list.checked&&S.list.checked[it.key]);
   const g=vGroups(c,it=>`data-pk="${esc(it.key)}"`,it=>`<input type="checkbox" class="ck" data-ck="${esc(it.key)}" aria-label="Got ${esc(it.name)}"${got(it)?' checked':''}>`,it=>S.pedit===it.key?vPriceEd(it.key):'',got);
   return `<div class="row" style="justify-content:space-between"><h2 class="v">Shopping list</h2><button data-act="clear">Clear list</button></div>
   <ul class="list" style="gap:6px;margin:10px 0">${ids.map(id=>`<li class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0"><button class="link" data-open="${esc(id)}">${esc(S.recipes[id].title)}</button><span class="serv" style="margin:0"><button data-ls="${esc(id)}" data-d="-1" aria-label="Fewer servings">−</button><b>${+L[id]}</b><button data-ls="${esc(id)}" data-d="1" aria-label="More servings">+</button></span></li>`).join('')}</ul>
   <article class="docket">${vStoreRows(c,0)}</article>
-  <h3 class="s">Where to buy</h3><p class="hint" style="margin:0">The same ingredient from different recipes is added together, and costs are for the whole packs you’ll buy. Tick items off as you shop.</p>${g}`;
+  <h3 class="s">Where to buy</h3><p class="hint" style="margin:0">The same ingredient from different recipes is added together, things you have at home are taken off, and costs are for the whole packs you’ll buy. Tick items off as you shop.</p>${g}
+  ${home.length?`<div class="grp"><h4>Already at home</h4><ul class="list" style="gap:0">${home.map(it=>`<li class="it done"><button data-pk="${esc(it.key)}"><span class="nm">${esc(it.name.charAt(0).toUpperCase()+it.name.slice(1))} · ${fq(it.amt,it.base)}</span><span class="c">✓</span><small>you have ${fq(it.have,it.base)}</small></button></li>`).join('')}</ul></div>`:''}
+  <div class="row" style="margin-top:18px"><button class="go" data-act="finish">Finished shopping</button></div><p class="hint">Clears the list and saves leftovers from whole packs (like the rest of a garlic bulb) to At home.</p>
+  ${vPantry()}`;
 }
-const AGGSTOP=new Set([...STOP,'clove','sprig','bunch','jar','packet','bag','pack','piece','head','bulb','stalk','stick','handful','fillet']);
-const aggKey=n=>toks(n).filter(w=>!AGGSTOP.has(w)).sort().join(' ')||key(n);
+const AGGSTOP=new Set([...STOP,'clove','sprig','bunch','jar','packet','bag','pack','piece','head','bulb','stalk','stick','handful','fillet','crushed','minced','softened','melted','unsalted','salted','extra','virgin','boneless','skinless','peeled','beaten','room','temperature','cold','warm','roughly','thinly','thickly','freshly','halved','quartered','trimmed','rinsed','drained','to','taste','about','approx','optional','serve','serving','good','quality','handful']);
+const SYN={tinned:'canned',tin:'canned',can:'canned',mince:'mince',ground:'mince',courgette:'courgette',zucchini:'courgette',capsicum:'capsicum',pepper:'pepper',coriander:'coriander',cilantro:'coriander',scallion:'spring onion',shallot:'shallot'};
+const aggKey=n=>{let w=toks(n).filter(x=>!AGGSTOP.has(x)).map(x=>SYN[x]||x);if(w.length>1)w=w.filter(x=>x!=='cheese');return [...new Set(w)].sort().join(' ')||key(n)};
 function conv(amt,from,to,name){if(from===to)return amt;if(from!=='ea'&&to!=='ea')return amt;const g=eaG(name);if(!g)return null;if(from==='ea'&&to==='g')return amt*g;if(from==='g'&&to==='ea')return amt/g;return null}
 const hasPrice=k=>{const p=S.prices[k];return !!(p&&CH.some(c=>p[c.id]&&+p[c.id].price>0))};
 function aggregate(entries){
@@ -521,7 +568,7 @@ app.addEventListener('keydown',e=>{const p=e.target.closest('[data-p]');if(p&&(e
 app.addEventListener('click',async e=>{
   const ck=e.target.closest('[data-ck]');
   if(ck){e.stopPropagation();const l=clone(S.list);l.checked=l.checked||{};if(ck.checked)l.checked[ck.dataset.ck]=true;else delete l.checked[ck.dataset.ck];await save('list',0,l);render(true);return}
-  const t=e.target.closest('[data-open],[data-edit],[data-act],[data-p],[data-pk],[data-tag],[data-ls],[data-pick],[data-unplan],[data-wk],[data-quick],[data-idea],[data-planday],[data-find],[data-pickres],[data-sort]');if(!t)return;
+  const t=e.target.closest('[data-open],[data-edit],[data-act],[data-p],[data-pk],[data-tag],[data-ls],[data-pick],[data-unplan],[data-wk],[data-quick],[data-idea],[data-planday],[data-find],[data-pickres],[data-sort],[data-pminus],[data-pdel]');if(!t)return;
   if(t.dataset.find){S.find={k:t.dataset.k,name:t.dataset.n,base:t.dataset.b,c:t.dataset.find,q:t.dataset.n,res:null,loading:true};render(true);await runFind();return}
   if(t.dataset.pickres!=null){const f=S.find,r=f&&f.res&&f.res[+t.dataset.pickres];if(!r)return;await linkProduct(f.k,f.name,f.base,f.c,r);S.find=null;flash('Linked to '+r.name);render(true);return}
   if(t.dataset.pick!=null){S.pick=+t.dataset.pick;render(true);return}
@@ -535,6 +582,8 @@ app.addEventListener('click',async e=>{
   if(t.dataset.open){S.cur=t.dataset.open;S.serv=null;S.edit=null;S.meta=false;if(location.hash==='#recipe')route();else location.hash='recipe';return}
   if(t.dataset.tag!=null){S.tag=t.dataset.tag;render(true);return}
   if(t.dataset.sort){S.sort=t.dataset.sort;render(true);return}
+  if(t.dataset.pdel){const P=clone(S.pantry);delete P.items[t.dataset.pdel];await save('pantry',0,P);render(true);return}
+  if(t.dataset.pminus){const P=clone(S.pantry),p=P.items[t.dataset.pminus];if(!p)return;const step=p.base==='ea'?1:p.amt>500?100:p.amt>50?25:5;p.amt=Math.round(Math.max(0,p.amt-step)*100)/100;if(p.amt<=0)delete P.items[t.dataset.pminus];await save('pantry',0,P);render(true);return}
   if(t.dataset.edit!=null){const ix=+t.dataset.edit;S.edit=S.edit===ix?null:ix;render(true);return}
   if(t.dataset.p){S.pedit=t.dataset.p;render(true);return}
   if(t.dataset.pk){S.pedit=S.pedit===t.dataset.pk?null:t.dataset.pk;render(true);return}
@@ -547,6 +596,10 @@ app.addEventListener('click',async e=>{
   else if(a==='cancel'){S.edit=null;render(true)}
   else if(a==='meta'){S.meta=!S.meta;render(true)}
   else if(a==='toplan'){S.planPick=!S.planPick;render(true)}
+  else if(a==='padd'){S.padd=S.padd?false:{};render(true)}
+  else if(a==='pcancel2'){S.padd=false;render(true)}
+  else if(a==='scan'){openScan()}
+  else if(a==='finish'){if(t.dataset.sure){await finishShop()}else{t.dataset.sure=1;t.textContent='Tap again to finish'}}
   else if(a==='fav'){const o=clone(r);o.fav=!o.fav;await save('recipes',S.cur,o);flash(o.fav?'Added to favourites':'Removed from favourites');render(true)}
   else if(a==='findgo'){if(S.find){S.find.loading=true;render(true);await runFind()}}
   else if(a==='geo'){if(!navigator.geolocation){flash('Location isn’t available on this device.');return}navigator.geolocation.getCurrentPosition(p=>{S.geo={lat:p.coords.latitude,lng:p.coords.longitude};render(true)},()=>flash('Couldn’t get your location. Pick your store from the list.'),{timeout:10000})}
@@ -586,6 +639,9 @@ app.addEventListener('submit',async e=>{
   }else if(f.dataset.form==='plan'){
     const i=+f.dataset.day,id=d.id,r=S.recipes[id];if(!r)return;
     await editWeek(x=>{(x['d'+i]=x['d'+i]||[]).push({id,serv:Math.max(1,+d.serv||+r.servings)})});S.pick=null;render(true);
+  }else if(f.dataset.form==='pantry'){
+    const name=(d.name||'').trim().toLowerCase(),amt=+d.amt;if(!name||!(amt>0)){flash('Enter the item and amount.');return}
+    await pantryAdd(name,amt,d.base,S.padd&&S.padd.scanned?'scan':'manual');S.padd=false;flash('Saved to At home.');render(true);
   }else if(f.dataset.form==='stores'){
     const st={use:{},names:{},ids:{}};for(const c of CH){st.use[c.id]=!!d['u_'+c.id];st.names[c.id]=(d['n_'+c.id]||'').trim()}
     if(!CH.some(c=>st.use[c.id])){flash('Tick at least one supermarket.');return}
@@ -610,9 +666,32 @@ app.addEventListener('submit',async e=>{
   }
 });
 
+let SC=null;
+async function lookupCode(code){
+  const m=$('#scanmsg');m.textContent='Looking up '+code+'…';
+  try{const r=await api('/barcode/'+code);closeScan();
+    const nm=(r.generic||r.name||'').toLowerCase();
+    S.padd={name:nm,amt:r.found?r.size:1,base:r.found?r.base:'ea',scanned:r.found?[r.brand,r.name,r.quantity].filter(Boolean).join(' '):'barcode '+code+' (not found, type the name)'};
+    location.hash='list';render(true);setTimeout(()=>{const el=$('#pa-n');if(el)el.focus()},100);
+  }catch(e){m.textContent='Lookup failed: '+e.message}
+}
+function closeScan(){if(SC){try{SC.stop&&SC.stop()}catch(e){}if(SC.stream)SC.stream.getTracks().forEach(t=>t.stop());clearInterval(SC.iv);SC=null}$('#scan').hidden=true}
+async function openScan(){
+  $('#scan').hidden=false;const v=$('#scanv'),m=$('#scanmsg');m.textContent='Starting camera…';
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){m.textContent='Camera isn’t available here. Type the barcode number below.';return}
+  try{const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});SC={stream};v.srcObject=stream;await v.play();m.textContent='Scanning…';
+    const done=code=>{if(!SC||SC.found)return;SC.found=true;if(navigator.vibrate)navigator.vibrate(80);lookupCode(code)};
+    if('BarcodeDetector' in window){const bd=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});SC.iv=setInterval(async()=>{try{const r=await bd.detect(v);if(r[0])done(r[0].rawValue)}catch(e){}},250)}
+    else{if(!window.ZXing){await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)})}
+      const hints=new Map();hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E]);
+      const rd=new ZXing.BrowserMultiFormatReader(hints);SC.stop=()=>rd.reset();rd.decodeFromStream(stream,v,(res)=>{if(res)done(res.getText())})}
+  }catch(e){m.textContent='Couldn’t start the camera. Allow camera access, or type the barcode number below.'}
+}
+document.addEventListener('click',e=>{if(e.target.id==='scanclose')closeScan()});
+document.addEventListener('submit',e=>{if(e.target.id==='scanman'){e.preventDefault();const c=($('#scancode').value||'').replace(/\D/g,'');if(c.length>=6){if(SC&&SC.stream){SC.found=true}lookupCode(c)}else $('#scanmsg').textContent='Enter the number under the barcode.'}});
 async function runFind(){const f=S.find;if(!f)return;try{f.res=await api(`/search?chain=${f.c}&store=${storeOf(f.c)}&q=${encodeURIComponent(f.q||f.name)}`);f.err=''}catch(e){f.err=e.message}f.loading=false;if(S.find===f)render(true)}
 async function load(){const d=await api(`/hh/${HH.id}/all`);S.recipes=d.recipes||{};S.prices=d.prices||{};const g=d.settings||{},st=g.stores,l=g.list,pl=g.plan;
-  if(st)S.st={use:{pns:true,ww:false,nw:true,...(st.use||{})},names:st.names||{},ids:st.ids||{}};if(l)S.list={recipes:l.recipes||{},checked:l.checked||{}};if(pl)S.plan={weeks:pl.weeks||{}};S.loading=false;S.note='';render()}
+  if(st)S.st={use:{pns:true,ww:false,nw:true,...(st.use||{})},names:st.names||{},ids:st.ids||{}};if(l)S.list={recipes:l.recipes||{},checked:l.checked||{}};if(pl)S.plan={weeks:pl.weeks||{}};if(g.pantry)S.pantry={items:g.pantry.items||{}};S.loading=false;S.note='';render()}
 async function init(){
   const q=new URLSearchParams(location.search).get('h');let id=q;
   if(!id){try{id=localStorage.getItem('rc-hh')}catch(e){}}

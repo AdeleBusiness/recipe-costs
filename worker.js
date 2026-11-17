@@ -157,6 +157,19 @@ export default {
         return J(await search(env, ch, st, q));
       }
       if (p === '/api/statsnz') { let v = JSON.parse(await env.KV.get('statsnz') || 'null'); if (!v) v = await refreshStats(env); return J(v || { items: [] }); }
+      const bc = p.match(/^\/api\/barcode\/(\d{6,14})$/);
+      if (bc) {
+        const k = 'bc:' + bc[1], c = await env.KV.get(k);
+        if (c) return J(JSON.parse(c));
+        const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${bc[1]}.json?fields=product_name,generic_name,quantity,brands`, { headers: { 'user-agent': 'RecipeCosts/1.0 (https://recipe-costs.recipecosts-nz.workers.dev)' } });
+        if (!r.ok && r.status !== 404) return J({ error: 'Product lookup failed (' + r.status + ')' }, 502);
+        const js = await r.json().catch(() => ({}));
+        const pr = js.product || {};
+        const q = String(pr.quantity || '').toLowerCase().replace(/\s+/g, '');
+        const out = { found: js.status === 1 && !!(pr.product_name || pr.generic_name), code: bc[1], name: pr.product_name || '', generic: pr.generic_name || '', brand: (pr.brands || '').split(',')[0], quantity: pr.quantity || '', ...(q ? size(q, '') : { size: 1, base: 'ea' }) };
+        await env.KV.put(k, JSON.stringify(out), { expirationTtl: 30 * 86400 });
+        return J(out);
+      }
       if (p === '/api/import' && req.method === 'POST') { const b = await req.json(); return J(await importRecipe(String(b.url || ''))); }
       const m = p.match(/^\/api\/hh\/([a-z0-9]+)\/(all|doc|refresh)(?:\/([a-z]+)\/(.+))?$/);
       if (m) {
