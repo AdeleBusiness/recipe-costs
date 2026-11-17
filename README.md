@@ -1,6 +1,8 @@
 # Recipe Costs
 
-Import recipes, cost them with live prices from your local Pak'nSave and New World, plan your week, and shop the cheapest way.
+Import recipes, cost them with official Stats NZ average food prices (updated monthly) and the prices you pay, plan your week and build your shopping list.
+
+Price data: Stats NZ Food Price Index selected weighted average prices, licensed under CC BY 4.0. Live supermarket price feeds are switched off (`LIVE = false`) until a permitted data source is available.
 
 - `index.html` – the app (served by the Worker)
 - `worker.js` – Cloudflare Worker: household data (D1), store lists, live product search, recipe import, hourly price refresh

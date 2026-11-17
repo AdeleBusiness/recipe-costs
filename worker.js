@@ -4,6 +4,7 @@ const FS = 'https://api-prod.prod.fsniwaikato.kiwi/prod';
 const BANNER = { pns: 'PNS', nw: 'MNW' };
 const UA = 'okhttp/4.12.0';
 const COLS = ['recipes', 'prices', 'settings'];
+const LIVE = false; // supermarket feeds switched off: no permitted source yet
 
 const J = (d, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 const rid = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(x => 'abcdefghjkmnpqrstuvwxyz23456789'[x % 31]).join(''); };
@@ -73,6 +74,41 @@ async function refreshDocs(env, docs, max) {
   return [...changed];
 }
 
+/* ---------- Stats NZ open data: Food Price Index weighted average prices (CC BY 4.0) ---------- */
+const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+const statsUrl = (y, m) => { const M = MONTHS[m]; const C = M[0].toUpperCase() + M.slice(1); return `https://www.stats.govt.nz/assets/Uploads/Selected-price-indexes/Selected-price-indexes-${C}-${y}/Download-data/selected-price-indexes-${M}-${y}.csv`; };
+const csvRow = l => { const o = []; let i = 0; while (i < l.length) { if (l[i] === '"') { const j = l.indexOf('"', i + 1); o.push(l.slice(i + 1, j)); i = j + 2; } else { let j = l.indexOf(',', i); if (j < 0) j = l.length; o.push(l.slice(i, j)); i = j + 1; } } return o; };
+function statsSize(title) {
+  const t = title.toLowerCase();
+  let m = t.match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|litres?|l)\b(?!.*\d+(?:\.\d+)?\s*(kg|g|ml|litres?|l)\b)/);
+  let size = 1, base = 'ea';
+  if (m) { const n = +m[1], u = m[2]; if (u === 'kg') { size = n * 1000; base = 'g'; } else if (u === 'g') { size = n; base = 'g'; } else if (u === 'ml') { size = n; base = 'ml'; } else { size = n * 1000; base = 'ml'; } }
+  if (/dozen/.test(t)) { size = 12; base = 'ea'; }
+  if (/^grapes/.test(t) && base === 'ea') { size = 1000; base = 'g'; }
+  m = t.match(/(?:pk of|box of|multipack,?)\s*(\d+)|(\d+)\s*pack/); if (m && !/\d+\s*(g|kg|ml|litre)/.test(t.split(',').pop())) { size = +(m[1] || m[2]); base = 'ea'; }
+  if (/pk of (\d+)/.test(t)) { const k = +t.match(/pk of (\d+)/)[1]; if (base !== 'ea') size = size * k; }
+  return { size, base };
+}
+async function refreshStats(env) {
+  const cur = JSON.parse(await env.KV.get('statsnz') || 'null');
+  const now = new Date();
+  for (let back = 1; back <= 3; back++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
+    const period = d.getUTCFullYear() + '.' + String(d.getUTCMonth() + 1).padStart(2, '0');
+    if (cur && cur.period >= period) return cur;
+    const r = await fetch(statsUrl(d.getUTCFullYear(), d.getUTCMonth()), { headers: { 'user-agent': 'RecipeCosts/1.0 (household recipe app; open data)' } });
+    if (!r.ok) continue;
+    const t = await r.text(), items = [];
+    for (const l of t.split('\n')) {
+      if (l.indexOf('Weighted Average Prices') < 0 || l.indexOf('"' + period + '"') < 0) continue;
+      const c = csvRow(l), price = +c[2]; if (!(price > 0)) continue;
+      items.push({ id: c[0].replace('CPIM.', ''), title: c[7], price, ...statsSize(c[7]) });
+    }
+    if (items.length > 20) { const v = { period, updated: Date.now(), source: 'Stats NZ, Food Price Index selected weighted average prices (CC BY 4.0)', items }; await env.KV.put('statsnz', JSON.stringify(v)); return v; }
+  }
+  return cur;
+}
+
 /* ---------- recipe import ---------- */
 const txt = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16)))
   .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&rsquo;|&lsquo;|&apos;/g, "'").replace(/&frac12;/g, '½').replace(/&frac14;/g, '¼').replace(/&frac34;/g, '¾').replace(/&nbsp;/g, ' ').replace(/&deg;/g, '°').replace(/\s+/g, ' ').trim();
@@ -113,12 +149,14 @@ export default {
       if (p === '/manifest.json') return J({ name: 'Recipe Costs', short_name: 'Recipe Costs', start_url: '/', display: 'standalone', background_color: '#ffffff', theme_color: '#2f5d50', icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }] });
       if (p === '/icon.svg') return new Response('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#2f5d50"/><path d="M28 22h44v58l-7-5-7 5-7-5-7 5-7-5-7 5z" fill="#fff"/><text x="50" y="62" font-family="Arial" font-weight="700" font-size="30" text-anchor="middle" fill="#cf3a20">$</text></svg>', { headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public,max-age=86400' } });
       if (p === '/api/hh' && req.method === 'POST') { const id = rid(12); await env.DB.prepare('INSERT INTO households(id,created) VALUES(?,?)').bind(id, Date.now()).run(); return J({ id }); }
+      if (!LIVE && (p === '/api/stores' || p === '/api/search' || /\/refresh$/.test(p))) return J({ error: 'Live supermarket prices are switched off' }, 410);
       if (p === '/api/stores') { const ch = url.searchParams.get('chain'); if (!BANNER[ch]) return J({ error: 'Unknown chain' }, 400); return J(await stores(env, ch)); }
       if (p === '/api/search') {
         const ch = url.searchParams.get('chain'), st = url.searchParams.get('store'), q = (url.searchParams.get('q') || '').trim().slice(0, 80);
         if (!BANNER[ch] || !/^[0-9a-f-]{36}$/.test(st || '') || !q) return J({ error: 'Choose a store and search term' }, 400);
         return J(await search(env, ch, st, q));
       }
+      if (p === '/api/statsnz') { let v = JSON.parse(await env.KV.get('statsnz') || 'null'); if (!v) v = await refreshStats(env); return J(v || { items: [] }); }
       if (p === '/api/import' && req.method === 'POST') { const b = await req.json(); return J(await importRecipe(String(b.url || ''))); }
       const m = p.match(/^\/api\/hh\/([a-z0-9]+)\/(all|doc|refresh)(?:\/([a-z]+)\/(.+))?$/);
       if (m) {
@@ -146,6 +184,8 @@ export default {
     } catch (e) { return J({ error: String(e && e.message || e) }, 500); }
   },
   async scheduled(evt, env) {
+    if (new Date().getUTCHours() === 20) { try { await refreshStats(env); } catch (e) { } }
+    if (!LIVE) return;
     const cut = Date.now() - 20 * 3600 * 1000;
     const rows = (await env.DB.prepare("SELECT hh,id,data FROM docs WHERE col='prices' LIMIT 3000").all()).results;
     const docs = [];
