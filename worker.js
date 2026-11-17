@@ -46,6 +46,12 @@ function size(units, saleType) {
   if (m) return { size: +m[1], base: 'ea' };
   return { size: 1, base: 'ea' };
 }
+function qty(t) {
+  const m = String(t || '').toLowerCase().replace(',', '.').match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|cl|l|litres?)\b/);
+  if (!m) { const n = String(t || '').match(/(\d+)\s*(pk|pack|x|ea|eggs|pieces)?/i); return n ? { size: +n[1], base: 'ea' } : { size: 1, base: 'ea' }; }
+  const n = +m[1], u = m[2];
+  return u === 'kg' ? { size: n * 1000, base: 'g' } : u === 'g' ? { size: n, base: 'g' } : u === 'ml' ? { size: n, base: 'ml' } : u === 'cl' ? { size: n * 10, base: 'ml' } : { size: n * 1000, base: 'ml' };
+}
 async function search(env, chain, store, q) {
   const js = await fs(env, chain, `/mobile/ecomm-products/${BANNER[chain]}/${store}/search?q=${encodeURIComponent(q)}`, { method: 'POST', body: '[]' });
   return (js.products || []).slice(0, 24).map(p => {
@@ -166,7 +172,7 @@ export default {
         const js = await r.json().catch(() => ({}));
         const pr = js.product || {};
         const q = String(pr.quantity || '').toLowerCase().replace(/\s+/g, '');
-        const out = { found: js.status === 1 && !!(pr.product_name || pr.generic_name), code: bc[1], name: pr.product_name || '', generic: pr.generic_name || '', brand: (pr.brands || '').split(',')[0], quantity: pr.quantity || '', ...(q ? size(q, '') : { size: 1, base: 'ea' }) };
+        const out = { found: js.status === 1 && !!(pr.product_name || pr.generic_name), code: bc[1], name: pr.product_name || '', generic: pr.generic_name || '', brand: (pr.brands || '').split(',')[0], quantity: pr.quantity || '', ...qty(pr.quantity) };
         await env.KV.put(k, JSON.stringify(out), { expirationTtl: 30 * 86400 });
         return J(out);
       }
